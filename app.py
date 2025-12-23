@@ -1,10 +1,9 @@
 from flask import Flask, render_template
-
 app = Flask(__name__)
 
 @app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
+def index():
+    return "<p>Welcome!</p>"
 
 @app.route("/about")
 def about():
