@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Login | FitQuest{% endblock %}
+{% block content %}
+<div class="proto-static-nav">
+  <span class="proto-static-pill">Home</span>
+  <span class="proto-static-pill">Game</span>
+  <span class="proto-static-pill">Help &amp; Support</span>
+  <span class="proto-static-pill">Progress</span>
+  <span class="proto-static-pill">Profile</span>
+</div>
+
+<div class="login-frame">
+  <section class="login-center-card">
+    <p class="login-eyebrow mb-1">FITQUEST</p>
+    <h1 class="login-title">Log in to continue</h1>
+    <p class="login-subtitle">
+      Pick up where you left off with your goals, game progress, and daily activity streak.
+    </p>
+
+    <form method="post" class="d-grid gap-2">
+      <input type="hidden" name="next" value="{{ next_target or '' }}">
+      <input
+        id="username"
+        name="username"
+        class="form-control login-input"
+        placeholder="Enter your email/username"
+        required
+      >
+      <input
+        id="password"
+        type="password"
+        name="password"
+        class="form-control login-input"
+        placeholder="Enter your password"
+        required
+      >
+      <button class="btn login-continue" type="submit">Continue</button>
+    </form>
+
+    <p class="login-divider">Create an account:</p>
+    <a class="btn login-alt-btn" href="{{ url_for('register') }}">Continue with email</a>
+  </section>
+</div>
+{% endblock %}

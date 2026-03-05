@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Edit Health | FitQuest{% endblock %}
+{% block content %}
+<section class="panel p-4">
+  <h1 class="h4 mb-3">Health Status</h1>
+  <p class="muted-text">Update these fields to improve personalized calorie/hydration recommendations and health tips.</p>
+  <form method="post" class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label" for="age">Age</label>
+      <input id="age" name="age" type="number" min="1" class="form-control" value="{{ health.age if health else '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="sex">Sex</label>
+      <input id="sex" name="sex" class="form-control" value="{{ health.sex if health else '' }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="activity_level">Activity Level</label>
+      <select id="activity_level" name="activity_level" class="form-select">
+        <option value="">Select level</option>
+        {% for level in activity_levels %}
+        <option value="{{ level }}" {% if health and health.activity_level == level %}selected{% endif %}>{{ level }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="climate">Climate</label>
+      <select id="climate" name="climate" class="form-select">
+        <option value="">Select climate</option>
+        {% for climate_option in climate_options %}
+        <option value="{{ climate_option }}" {% if health and health.climate == climate_option %}selected{% endif %}>{{ climate_option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label" for="weight_kg">Weight (kg)</label>
+      <input id="weight_kg" name="weight_kg" type="number" step="0.1" min="0" class="form-control" value="{{ health.weight_kg if health else '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="height_cm">Height (cm)</label>
+      <input id="height_cm" name="height_cm" type="number" step="0.1" min="0" class="form-control" value="{{ health.height_cm if health else '' }}">
+    </div>
+
+    <div class="col-md-6">
+      <label class="form-label" for="overall_health">Overall Health Notes</label>
+      <input id="overall_health" name="overall_health" class="form-control" value="{{ health.overall_health if health else '' }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="health_conditions">Health Conditions</label>
+      <input id="health_conditions" name="health_conditions" class="form-control" value="{{ health.health_conditions if health else '' }}" placeholder="e.g., knee pain, asthma">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="diet_profile">Diet Profile</label>
+      <input id="diet_profile" name="diet_profile" class="form-control" value="{{ health.diet_profile if health else '' }}" placeholder="e.g., balanced, high protein, vegetarian">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="mood">Mood</label>
+      <input id="mood" name="mood" class="form-control" value="{{ health.mood if health else '' }}">
+    </div>
+
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Save Health Data</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

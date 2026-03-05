@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Register | FitQuest{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <div class="card auth-card">
+    <div class="row g-0">
+      <div class="col-lg-5 auth-hero p-4 p-lg-5 d-flex flex-column justify-content-center">
+        <h1 class="mb-3">Create Your Account</h1>
+        <p class="mb-0">Register to save activities, track hydration/calories, play game sessions, and earn XP for avatar unlocks.</p>
+      </div>
+      <div class="col-lg-7 bg-white p-4 p-lg-5">
+        <h2 class="h4 mb-4">New User Registration</h2>
+        <form method="post" class="row g-3">
+          <div class="col-md-6">
+            <label for="username" class="form-label">Username</label>
+            <input id="username" name="username" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label for="email" class="form-label">Email</label>
+            <input id="email" type="email" name="email" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label for="password" class="form-label">Password</label>
+            <input id="password" type="password" name="password" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label for="first_name" class="form-label">First Name</label>
+            <input id="first_name" name="first_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="last_name" class="form-label">Last Name</label>
+            <input id="last_name" name="last_name" class="form-control">
+          </div>
+          <div class="col-12">
+            <label for="phone_num" class="form-label">Phone Number</label>
+            <input id="phone_num" name="phone_num" class="form-control">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-success w-100" type="submit">Create Account</button>
+          </div>
+          <div class="col-12 text-center">
+            <small class="muted-text">Already registered? <a href="{{ url_for('login') }}">Log in</a>.</small>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

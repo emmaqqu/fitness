@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FitQuest{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Nunito+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <main class="page-wrap">
+    <section class="prototype-shell {% if not current_user %}prototype-shell-auth{% endif %}">
+      {% if current_user %}
+      <header class="proto-top">
+        <nav class="proto-nav" aria-label="Primary">
+          <a class="proto-nav-link {% if request.path.startswith('/home') %}active{% endif %}" href="{{ url_for('home') }}">Home</a>
+          <a class="proto-nav-link {% if request.path.startswith('/game') or request.path.startswith('/solo') or request.path.startswith('/coop') %}active{% endif %}" href="{{ url_for('game') }}">Game</a>
+          <a class="proto-nav-link {% if request.path.startswith('/help') or request.path.startswith('/search') %}active{% endif %}" href="{{ url_for('search') }}">Help &amp; Support</a>
+          <a class="proto-nav-link {% if request.path.startswith('/progress') or request.path.startswith('/viewprogress') %}active{% endif %}" href="{{ url_for('progress', period='weekly') }}">Progress</a>
+          <a class="proto-nav-link {% if request.path.startswith('/profile') %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
+        </nav>
+        <div class="proto-userline">
+          <span>{{ current_user }}</span>
+          <a href="{{ url_for('logout') }}">Logout</a>
+        </div>
+      </header>
+      {% endif %}
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+          {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Hydration | FitQuest{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <section class="panel p-4 mb-4">
+      <h1 class="h4 mb-3">Track Hydration</h1>
+      <form method="post" class="row g-3">
+        <div class="col-12">
+          <label class="form-label" for="hydration_intake">Hydration Intake (litres)</label>
+          <input id="hydration_intake" name="hydration_intake" type="number" min="0.1" step="0.1" class="form-control" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="entry_date">Log Date</label>
+          <input id="entry_date" name="entry_date" type="date" class="form-control" value="{{ today }}">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary w-100" type="submit">Save Intake</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel p-4">
+      <h2 class="h5 mb-2">Recommended Intake</h2>
+      <p class="display-6 fw-bold text-primary mb-1">{{ recommendation.recommended }} L/day</p>
+      <p class="mb-0 muted-text">{{ recommendation.basis }}</p>
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="panel p-4">
+      <h2 class="h5 mb-3">Hydration Logs</h2>
+      {% if logs %}
+      <div class="table-responsive">
+        <table class="table table-fitquest align-middle">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Hydration</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in logs %}
+            <tr>
+              <td>{{ item.entry_date }}</td>
+              <td>{{ item.hydration_intake }} L</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No hydration logs yet.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

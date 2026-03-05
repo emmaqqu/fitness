@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Help & Support | FitQuest{% endblock %}
+{% block content %}
+<div class="help-shell">
+  <section class="search-strip mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-10">
+        <label for="search-query" class="form-label search-label">Search health topics</label>
+        <input
+          id="search-query"
+          type="text"
+          name="q"
+          value="{{ query }}"
+          class="form-control"
+          placeholder="Try hydration, sleep, stress, or nutrition"
+        >
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-light w-100" type="submit">Search</button>
+      </div>
+    </form>
+  </section>
+
+  <div class="row g-3 align-items-start">
+    <div class="col-lg-9">
+      <section class="concern-card">
+        <h2>Find Common Health Concerns and Practical Next Steps</h2>
+
+        {% if query %}
+          <p class="concern-meta mb-3">
+            Start with a topic above to see curated guidance and tips.
+          </p>
+        {% endif %}
+
+        {% if query and results %}
+          <div class="result-grid">
+            {% for item in results %}
+              <article class="topic-result">
+                <h3 class="h6 mb-1">{{ item.topic|title }}</h3>
+                <p class="mb-2">{{ item.summary }}</p>
+                {% if item.tips %}
+                <ul class="topic-tips mb-0">
+                  {% for tip in item.tips %}
+                  <li>{{ tip }}</li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% elif query %}
+          <p class="row-sub mt-3 mb-0">No match found. Try hydration, sleep, stress, or nutrition.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="col-lg-3">
+      <section class="mood-card">
+        <h3 class="h6 mb-2">Mood Check-In</h3>
+        <div class="mood-line">Current mood: {{ health.mood if health and health.mood else 'Not set' }}</div>
+
+        <div class="d-grid gap-2 mt-2">
+          {% for mood_option in ["Feeling good", "Feeling okay", "Feeling stressed"] %}
+          <form method="post" class="m-0">
+            <input type="hidden" name="mood" value="{{ mood_option }}">
+            <button class="btn btn-sm btn-outline-light w-100" type="submit">{{ mood_option }}</button>
+          </form>
+          {% endfor %}
+        </div>
+
+        <form method="post" class="mood-form mt-3">
+          <label for="custom-mood" class="form-label small mb-1">Or type your own mood</label>
+          <input
+            id="custom-mood"
+            type="text"
+            name="mood"
+            class="form-control form-control-sm"
+            maxlength="80"
+            placeholder="Type your mood"
+            required
+          >
+          <button class="btn btn-sm btn-light w-100 mt-2" type="submit">Save Mood</button>
+        </form>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Solo Game | FitQuest{% endblock %}
+{% block content %}
+<section class="panel p-4 mb-4">
+  <h1 class="h4 mb-2">Solo Game Mode</h1>
+  <p class="muted-text mb-0">Challenge an AI opponent and earn XP by completing exercise tasks.</p>
+</section>
+
+<section class="panel p-4 mb-4">
+  <form method="post">
+    <button class="btn btn-primary" type="submit">Play Solo Round</button>
+  </form>
+</section>
+
+{% if result %}
+<section class="panel p-4">
+  <h2 class="h5 mb-3">Round Result</h2>
+  <ul class="mb-0">
+    <li>Challenge: {{ result.challenge.name }}</li>
+    <li>Duration: {{ result.challenge.duration }} minutes</li>
+    <li>Calories: {{ result.challenge.calories }}</li>
+    <li>XP Earned: {{ result.challenge.xp }}</li>
+    <li>Winner: {{ result.winner }}</li>
+    <li>Session ID: {{ result.session.session_id }}</li>
+    <li>Current Level: {{ result.session.level }}</li>
+    <li>Total XP: {{ result.session.xp }}</li>
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

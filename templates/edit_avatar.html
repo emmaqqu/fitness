@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Edit Avatar | FitQuest{% endblock %}
+{% block content %}
+{% set current_level = profile.level if profile else 1 %}
+{% set current_avatar_id = profile.avatar_id if profile else 0 %}
+<section class="panel p-4 mb-4">
+  <h1 class="h4 mb-2">Avatar Customization</h1>
+  <p class="mb-0 muted-text">Current avatar: <strong>{{ profile.avatar_name if profile else 'None' }}</strong>. Current level: <strong>{{ current_level }}</strong>.</p>
+</section>
+
+<div class="row g-3">
+  {% for avatar in avatars %}
+  <div class="col-md-6 col-lg-4">
+    <article class="avatar-card h-100 {% if current_avatar_id == avatar.avatar_id %}selected{% endif %}">
+      <div class="avatar-art {{ avatar.theme_class }}">
+        <img src="{{ url_for('static', filename=avatar.art_file) }}" alt="{{ avatar.avatar_name }} avatar">
+      </div>
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h6 mb-0">{{ avatar.avatar_name }}</h2>
+        <span class="avatar-badge">Unlock Lv {{ avatar.unlock_level }}</span>
+      </div>
+      <p class="small muted-text mb-3">{{ avatar.tagline }}</p>
+
+      {% if current_avatar_id == avatar.avatar_id %}
+      <div class="small fw-semibold text-success mb-2">Current Avatar</div>
+      {% endif %}
+
+      {% if current_level >= avatar.unlock_level %}
+      <form method="post">
+        <input type="hidden" name="avatar_id" value="{{ avatar.avatar_id }}">
+        {% if current_avatar_id == avatar.avatar_id %}
+        <button class="btn btn-sm btn-outline-secondary w-100" type="button" disabled>Selected</button>
+        {% else %}
+        <button class="btn btn-sm btn-primary w-100" type="submit">Select Avatar</button>
+        {% endif %}
+      </form>
+      {% else %}
+      <button class="btn btn-sm btn-outline-secondary w-100" type="button" disabled>Locked</button>
+      {% endif %}
+    </article>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

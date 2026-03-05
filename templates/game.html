@@ -1,0 +1,448 @@
+{% extends 'base.html' %}
+{% block title %}Game | FitQuest{% endblock %}
+{% block content %}
+<div class="game-shell">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div class="d-flex flex-wrap gap-2">
+      <form method="post" class="m-0">
+        <input type="hidden" name="action" value="set_mode">
+        <input type="hidden" name="mode" value="Solo">
+        <button class="btn btn-sm {% if game.mode == 'Solo' %}btn-light{% else %}btn-outline-light{% endif %}" type="submit">Solo Mode</button>
+      </form>
+      <form method="post" class="m-0">
+        <input type="hidden" name="action" value="set_mode">
+        <input type="hidden" name="mode" value="Co-op">
+        <button class="btn btn-sm {% if game.mode == 'Co-op' %}btn-light{% else %}btn-outline-light{% endif %}" type="submit">Co-op Mode</button>
+      </form>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% for level in game.difficulties %}
+      <form method="post" class="m-0">
+        <input type="hidden" name="action" value="set_difficulty">
+        <input type="hidden" name="difficulty" value="{{ level }}">
+        <button class="btn btn-sm {% if game.difficulty == level %}btn-warning{% else %}btn-outline-warning{% endif %}" type="submit">{{ level }}</button>
+      </form>
+      {% endfor %}
+
+      {% if game.mode == 'Solo' or game.is_coop_match %}
+      <form method="post" class="m-0">
+        <input type="hidden" name="action" value="new_game">
+        <button class="btn btn-sm btn-primary" type="submit">New Match</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if game.is_coop_lobby %}
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <section class="panel p-3 h-100">
+        <h3 class="h6 mb-3">Invite a Friend</h3>
+        {% if game.coop_friends %}
+        <div class="d-grid gap-2">
+          {% for friend in game.coop_friends %}
+          <form method="post" class="d-flex justify-content-between align-items-center border rounded px-2 py-2 bg-white">
+            <span class="fw-semibold small">{{ friend.friend_username }}</span>
+            <input type="hidden" name="action" value="send_invite">
+            <input type="hidden" name="target_username" value="{{ friend.friend_username }}">
+            <button class="btn btn-sm btn-outline-primary" type="submit">Invite</button>
+          </form>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="mb-0 muted-text">No accepted friends yet. Add friends first to play co-op.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="col-lg-6">
+      <section class="panel p-3 mb-3">
+        <h3 class="h6 mb-2">Incoming Invites</h3>
+        {% if game.incoming_invites %}
+        <div class="d-grid gap-2">
+          {% for invite in game.incoming_invites %}
+          <div class="border rounded px-2 py-2 bg-white">
+            <div class="small fw-semibold mb-2">{{ invite.from_username }} invited you</div>
+            <div class="d-flex gap-2">
+              <form method="post" class="m-0">
+                <input type="hidden" name="action" value="respond_invite">
+                <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+                <input type="hidden" name="decision" value="accept">
+                <button class="btn btn-sm btn-success" type="submit">Accept</button>
+              </form>
+              <form method="post" class="m-0">
+                <input type="hidden" name="action" value="respond_invite">
+                <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+                <input type="hidden" name="decision" value="decline">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">Decline</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="mb-0 muted-text">No incoming invites.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel p-3">
+        <h3 class="h6 mb-2">Outgoing Invites</h3>
+        {% if game.outgoing_invites %}
+        <div class="d-grid gap-2">
+          {% for invite in game.outgoing_invites %}
+          <div class="border rounded px-2 py-2 bg-white d-flex justify-content-between align-items-center">
+            <span class="small fw-semibold">Waiting on {{ invite.to_username }}</span>
+            <form method="post" class="m-0">
+              <input type="hidden" name="action" value="cancel_invite">
+              <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="mb-0 muted-text">No outgoing invites.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+
+  <section class="panel p-3 mt-3 game-message">
+    <div class="row-main mb-1">Co-op Lobby</div>
+    <div class="row-sub">{{ game.message }}</div>
+  </section>
+
+  {% else %}
+  <div class="game-stat-row mb-3">
+    <span class="game-stat-chip">Turns: {{ game.turn_count }}</span>
+    <span class="game-stat-chip">Combo: {{ game.combo_streak }}</span>
+    <span class="game-stat-chip">Best Combo: {{ game.best_combo }}</span>
+    <span class="game-stat-chip">Bonus XP Pool: {{ game.bonus_xp }}</span>
+    <span class="game-stat-chip">Draw Count: {{ game.draw_count }}</span>
+  </div>
+
+  <div class="row g-4 align-items-stretch">
+    <div class="col-xl-8">
+      <section class="game-board h-100">
+        <div class="ai-hand-label">{{ game.opponent_name }} Hand: {{ game.opponent_count }} card(s)</div>
+        <div class="ai-cards">
+          {% for _ in range(game.opponent_count) %}
+          <div class="ai-card"></div>
+          {% endfor %}
+        </div>
+
+        <div class="game-mid">
+          <div class="discard-label">Discard Pile:</div>
+          <div class="discard-card {{ game.discard.css_class }}">
+            {{ game.discard.exercise_name }}<br>{{ game.discard.minutes }} min<br>{{ game.discard.color_name }}
+          </div>
+          <div class="row-sub mt-1">Deck: {{ game.deck_count }} card(s)</div>
+        </div>
+
+        <div class="player-hand-label">Your Hand ({{ game.player_count }}):</div>
+        <div class="player-cards">
+          {% for card in game.player_cards %}
+          <div class="card-stack">
+            <form method="post" class="m-0 card-form">
+              <input type="hidden" name="action" value="play_card">
+              {% if game.is_coop_match %}
+              <input type="hidden" name="match_id" value="{{ game.match_id }}">
+              {% endif %}
+              <input type="hidden" name="card_index" value="{{ card.index }}">
+              <button
+                class="player-card {{ card.css_class }} {% if card.is_power %}power{% endif %} {% if not card.playable %}disabled{% endif %}"
+                type="submit"
+                {% if not card.playable %}disabled{% endif %}
+              >
+                {{ card.exercise_name }}<br>
+                {{ card.color_name }}<br>
+                {{ card.minutes }} min
+                {% if card.effect != 'none' %}
+                <span class="card-effect-tag">{{ card.effect_label }}</span>
+                {% endif %}
+              </button>
+            </form>
+            <div class="card-actions">
+              <button
+                type="button"
+                class="btn btn-light btn-sm card-info-btn"
+                data-exercise="{{ card.exercise_name }}"
+                data-minutes="{{ card.minutes }}"
+                data-calories="{{ card.calories }}"
+                data-effect="{{ card.effect_label }}"
+                data-effect-description="{{ card.effect_description }}"
+                data-description="{{ card.exercise_description }}"
+              >
+                Info
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-primary btn-sm card-timer-btn"
+                data-seconds="{{ card.minutes * 60 }}"
+                data-label="{{ card.exercise_name }}"
+                data-minutes="{{ card.minutes }}"
+              >
+                Timer
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="card-tools">
+          <section class="game-mini-panel">
+            <div class="row-main mb-1">Exercise Timer</div>
+            <div id="exercise-timer-display" class="timer-display">00:00</div>
+            <div id="exercise-timer-label" class="row-sub mt-1">Select a card timer to begin.</div>
+            <div id="exercise-timer-hint" class="row-sub">No active timer.</div>
+            <div class="d-flex gap-2 mt-2">
+              <button id="timer-pause-btn" type="button" class="btn btn-sm btn-outline-secondary" disabled>Pause</button>
+              <button id="timer-reset-btn" type="button" class="btn btn-sm btn-outline-secondary" disabled>Reset</button>
+            </div>
+          </section>
+
+          <section class="game-mini-panel">
+            <div class="row-main mb-1">Card Info</div>
+            <div id="exercise-info-title" class="fw-semibold small">Select a card.</div>
+            <div id="exercise-info-meta" class="row-sub mt-1">Press <strong>Info</strong> on any card.</div>
+            <p id="exercise-info-description" class="small mb-0 mt-2">Exercise details appear here.</p>
+            <p id="exercise-info-effect" class="small mb-0 mt-2 muted-text"></p>
+          </section>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="draw_card">
+            {% if game.is_coop_match %}
+            <input type="hidden" name="match_id" value="{{ game.match_id }}">
+            {% endif %}
+            <button
+              class="draw-card-btn"
+              type="submit"
+              {% if game.status != 'active' or game.turn != 'player' %}disabled{% endif %}
+            >
+              Draw Card
+            </button>
+          </form>
+
+          {% if game.is_coop_match %}
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="leave_match">
+            <input type="hidden" name="match_id" value="{{ game.match_id }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Leave Match</button>
+          </form>
+          {% endif %}
+
+          <span class="game-turn-badge">
+            Turn:
+            {% if game.turn == 'player' %}
+              You
+            {% elif game.turn == 'opponent' %}
+              {{ game.opponent_name }}
+            {% else %}
+              Finished
+            {% endif %}
+          </span>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-4">
+      <section class="instruction-bubble h-100">
+        <h3>How To Play</h3>
+        <ul>
+          <li>Match the top discard card by color or exercise.</li>
+          <li>Power cards grant special effects and bonus XP.</li>
+          <li>Drawing a playable card lets you play again immediately.</li>
+          <li>Complete your side quest for extra XP.</li>
+        </ul>
+
+        <div class="quest-card mt-3">
+          <div class="quest-title">Side Quest: {{ game.quest.title }}</div>
+          <div class="quest-text">{{ game.quest.text }}</div>
+          <div class="quest-track mt-2">
+            <div class="quest-fill" style="width: {{ game.quest_progress_pct }}%"></div>
+          </div>
+          <div class="quest-meta">{{ game.quest.progress }}/{{ game.quest.target }} | Bonus {{ game.quest.bonus_xp }} XP</div>
+        </div>
+
+        <hr class="border-light opacity-50">
+        <p class="mb-1"><strong>Mode:</strong> {{ game.mode }}</p>
+        <p class="mb-1"><strong>Difficulty:</strong> {{ game.difficulty }}</p>
+        <p class="mb-1"><strong>Status:</strong> {{ game.status|title }}</p>
+        <p class="mb-1"><strong>Cards Played:</strong> {{ game.player_cards_played }}</p>
+        <p class="mb-1"><strong>Exercise Minutes:</strong> {{ game.player_total_minutes }}</p>
+        <p class="mb-2"><strong>Calories Burned:</strong> {{ game.player_total_calories }}</p>
+
+        {% if game.status == 'finished' %}
+        <p class="mb-1"><strong>Winner:</strong> {{ game.winner }}</p>
+        <p class="mb-1"><strong>XP Earned:</strong> {{ game.xp_earned }}</p>
+        {% if game.session_result %}
+        <p class="mb-2"><strong>Level:</strong> {{ game.session_result.level }} | <strong>Total XP:</strong> {{ game.session_result.xp }}</p>
+        {% endif %}
+
+        {% if game.badges %}
+        <div class="badge-wrap">
+          {% for badge in game.badges %}
+          <span class="game-badge">{{ badge }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+      </section>
+    </div>
+  </div>
+
+  <section class="panel p-3 mt-3 game-message">
+    <div class="row-main mb-1">Game Feed</div>
+    {% if game.event_log %}
+    <ul class="game-feed-list mb-0">
+      {% for event in game.event_log %}
+      <li>{{ event }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="row-sub">No events yet.</div>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% if not game.is_coop_lobby %}
+<script>
+  (function () {
+    const timerDisplay = document.getElementById("exercise-timer-display");
+    const timerLabel = document.getElementById("exercise-timer-label");
+    const timerHint = document.getElementById("exercise-timer-hint");
+    const pauseBtn = document.getElementById("timer-pause-btn");
+    const resetBtn = document.getElementById("timer-reset-btn");
+    const timerButtons = document.querySelectorAll(".card-timer-btn");
+    const infoButtons = document.querySelectorAll(".card-info-btn");
+    const infoTitle = document.getElementById("exercise-info-title");
+    const infoMeta = document.getElementById("exercise-info-meta");
+    const infoDescription = document.getElementById("exercise-info-description");
+    const infoEffect = document.getElementById("exercise-info-effect");
+
+    if (!timerDisplay || !timerLabel || !timerHint || !pauseBtn || !resetBtn) {
+      return;
+    }
+
+    let remainingSeconds = 0;
+    let initialSeconds = 0;
+    let activeLabel = "";
+    let intervalId = null;
+
+    function formatTime(totalSeconds) {
+      const safe = Math.max(0, totalSeconds);
+      const minutes = String(Math.floor(safe / 60)).padStart(2, "0");
+      const seconds = String(safe % 60).padStart(2, "0");
+      return `${minutes}:${seconds}`;
+    }
+
+    function renderTimer() {
+      timerDisplay.textContent = formatTime(remainingSeconds);
+    }
+
+    function stopTicking() {
+      if (!intervalId) {
+        return;
+      }
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function completeTimer() {
+      stopTicking();
+      remainingSeconds = 0;
+      renderTimer();
+      timerHint.textContent = `${activeLabel} complete. Nice work.`;
+      pauseBtn.textContent = "Pause";
+    }
+
+    function startTicking() {
+      stopTicking();
+      intervalId = window.setInterval(function () {
+        if (remainingSeconds <= 0) {
+          completeTimer();
+          return;
+        }
+        remainingSeconds -= 1;
+        renderTimer();
+        if (remainingSeconds <= 0) {
+          completeTimer();
+        }
+      }, 1000);
+    }
+
+    function startTimer(seconds, label, minutes) {
+      initialSeconds = Math.max(0, Number(seconds) || 0);
+      remainingSeconds = initialSeconds;
+      activeLabel = label || "Exercise";
+      timerLabel.textContent = `${activeLabel} timer`;
+      timerHint.textContent = `${minutes} minute card in progress.`;
+      pauseBtn.disabled = initialSeconds <= 0;
+      resetBtn.disabled = initialSeconds <= 0;
+      pauseBtn.textContent = "Pause";
+      renderTimer();
+      if (initialSeconds > 0) {
+        startTicking();
+      }
+    }
+
+    timerButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        const seconds = button.dataset.seconds;
+        const label = button.dataset.label;
+        const minutes = button.dataset.minutes || "0";
+        startTimer(seconds, label, minutes);
+      });
+    });
+
+    pauseBtn.addEventListener("click", function () {
+      if (!initialSeconds) {
+        return;
+      }
+      if (intervalId) {
+        stopTicking();
+        pauseBtn.textContent = "Resume";
+        timerHint.textContent = `${activeLabel} paused.`;
+      } else {
+        startTicking();
+        pauseBtn.textContent = "Pause";
+        timerHint.textContent = `${activeLabel} timer resumed.`;
+      }
+    });
+
+    resetBtn.addEventListener("click", function () {
+      if (!initialSeconds) {
+        return;
+      }
+      stopTicking();
+      remainingSeconds = initialSeconds;
+      renderTimer();
+      pauseBtn.textContent = "Pause";
+      timerHint.textContent = `${activeLabel} timer reset.`;
+    });
+
+    infoButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        if (!infoTitle || !infoMeta || !infoDescription || !infoEffect) {
+          return;
+        }
+        const exercise = button.dataset.exercise || "Exercise";
+        const minutes = button.dataset.minutes || "-";
+        const calories = button.dataset.calories || "-";
+        const effect = button.dataset.effect || "Standard";
+        const effectDescription = button.dataset.effectDescription || "";
+        const description = button.dataset.description || "No exercise details available.";
+
+        infoTitle.textContent = exercise;
+        infoMeta.textContent = `${minutes} min | ${calories} kcal | Effect: ${effect}`;
+        infoDescription.textContent = description;
+        infoEffect.textContent = effectDescription;
+      });
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

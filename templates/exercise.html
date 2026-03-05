@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Exercise | FitQuest{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-xl-4">
+    <section class="panel p-4 h-100">
+      <div class="section-title mb-2">
+        <h1 class="h4 mb-0">Possible Goals</h1>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('modify_goals') }}">Manage</a>
+      </div>
+      <p class="small muted-text mb-3">
+        Suggestions are generated from totals and trends in your exercise data table.
+      </p>
+
+      {% if goal_suggestions %}
+      <div class="d-grid gap-3">
+        {% for item in goal_suggestions %}
+        <article class="border rounded-3 p-3 bg-white">
+          <h2 class="h6 mb-1">{{ item.title }}</h2>
+          <p class="small muted-text mb-2">{{ item.reason }}</p>
+          <p class="mb-3">
+            <strong>{{ item.target_display }} {{ item.unit }}</strong>
+            <span class="muted-text">target</span>
+          </p>
+
+          {% if item.already_active %}
+          <button class="btn btn-secondary btn-sm w-100" type="button" disabled>
+            Active Goal Already Exists
+          </button>
+          {% else %}
+          <form method="post">
+            <input type="hidden" name="action" value="add_goal_from_exercise">
+            <input type="hidden" name="goal_type_id" value="{{ item.goal_type_id }}">
+            <input type="hidden" name="target_value" value="{{ item.target_value }}">
+            <button class="btn btn-primary btn-sm w-100" type="submit">Add This Goal</button>
+          </form>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">Log activities to unlock suggested goals.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel p-4 mt-4">
+      <h2 class="h5 mb-3">Category Exercise Suggestions</h2>
+      <p class="small muted-text mb-3">
+        Suggestions align with your active fitness goals and recent performance.
+      </p>
+      {% if category_suggestions %}
+      <div class="d-grid gap-2">
+        {% for item in category_suggestions %}
+        <article class="border rounded-3 p-3 bg-white">
+          <div class="small fw-semibold mb-1">{{ item.category }}</div>
+          <div class="mb-1">{{ item.exercise }}</div>
+          <div class="small muted-text">{{ item.duration }} min · {{ item.reason }}</div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">Add goals to receive category-based exercise suggestions.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col-xl-8">
+    <section class="panel p-4">
+      <h2 class="h4 mb-3">Exercise Data Table</h2>
+      {% if activities %}
+      <div class="table-responsive">
+        <table class="table table-fitquest align-middle">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Duration</th>
+              <th>Calories</th>
+              <th>Distance</th>
+              <th>Difficulty</th>
+              <th>Source</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in activities %}
+            <tr>
+              <td>{{ item.type }}</td>
+              <td>{{ item.duration_minutes }} min</td>
+              <td>{{ item.calories or '-' }}</td>
+              <td>{{ item.distance_km or '-' }}</td>
+              <td>{{ item.difficulty or 'Standard' }}</td>
+              <td>{{ item.source }}</td>
+              <td>{{ item.activity_date }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No activities recorded yet.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Modify Goals | FitQuest{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <section class="panel p-4">
+      <h1 class="h4 mb-3">Add Goal</h1>
+      <form method="post" class="row g-3">
+        <input type="hidden" name="action" value="add">
+        <div class="col-12">
+          <label class="form-label" for="goal_type_id">Goal Type</label>
+          <select id="goal_type_id" name="goal_type_id" class="form-select" required>
+            {% for item in goal_types %}
+            <option value="{{ item.goal_type_id }}">{{ item.goal_type_name }} ({{ item.unit }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="target_value">Target Value</label>
+          <input id="target_value" name="target_value" type="number" step="0.01" min="0" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="start_date">Start Date</label>
+          <input id="start_date" name="start_date" type="date" class="form-control" value="{{ today }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="end_date">End Date</label>
+          <input id="end_date" name="end_date" type="date" class="form-control">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary w-100" type="submit">Save Goal</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="panel p-4">
+      <h2 class="h5 mb-3">Current Goals</h2>
+      {% if goals %}
+      <div class="table-responsive">
+        <table class="table table-fitquest align-middle">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Target</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+              <th>Update</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for goal in goals %}
+            <tr>
+              <td>{{ goal.goal_type_name }}</td>
+              <td>{{ goal.target_value }} {{ goal.unit }}</td>
+              <td>{{ goal.start_date }}</td>
+              <td>{{ goal.end_date or '-' }}</td>
+              <td>{{ goal.status }}</td>
+              <td>
+                <form method="post" class="d-flex gap-2">
+                  <input type="hidden" name="action" value="status">
+                  <input type="hidden" name="goal_id" value="{{ goal.goal_id }}">
+                  <select name="status" class="form-select form-select-sm" aria-label="status">
+                    {% for option in ['Active', 'On Track', 'Completed', 'Cancelled'] %}
+                    <option value="{{ option }}" {% if option == goal.status %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                  </select>
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No goals yet. Add your first goal on the left.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

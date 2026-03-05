@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Card Master avatar">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dca0e2"/>
+      <stop offset="100%" stop-color="#7e64cc"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <rect x="95" y="122" width="190" height="268" rx="24" transform="rotate(-12 190 256)" fill="#f7f9ff" stroke="#d8ddfb" stroke-width="10"/>
+  <rect x="228" y="122" width="190" height="268" rx="24" transform="rotate(10 323 256)" fill="#f7f9ff" stroke="#d8ddfb" stroke-width="10"/>
+  <rect x="160" y="124" width="190" height="268" rx="24" fill="#f7f9ff" stroke="#d8ddfb" stroke-width="10"/>
+  <circle cx="255" cy="197" r="40" fill="#6d52c0"/>
+  <path d="M255 246l-24 47h48z" fill="#6d52c0"/>
+  <path d="M184 326c20-24 41-34 68-34 26 0 48 10 76 34" fill="none" stroke="#6d52c0" stroke-linecap="round" stroke-width="14"/>
+</svg>

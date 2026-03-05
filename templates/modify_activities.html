@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Modify Activities | FitQuest{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <section class="panel p-4">
+      <h1 class="h4 mb-3">Log Activity</h1>
+      <form method="post" class="row g-3">
+        <div class="col-12">
+          <label for="type" class="form-label">Activity Type</label>
+          <input id="type" name="type" class="form-control" placeholder="e.g., Running" required>
+        </div>
+        <div class="col-md-6">
+          <label for="duration_minutes" class="form-label">Duration (minutes, optional)</label>
+          <input id="duration_minutes" name="duration_minutes" type="number" min="1" class="form-control">
+          <div class="form-text">Leave blank to auto-calculate from start/end time or estimate by activity type.</div>
+        </div>
+        <div class="col-md-6">
+          <label for="calories" class="form-label">Calories Burned</label>
+          <input id="calories" name="calories" type="number" min="0" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label for="start_time" class="form-label">Start Time (optional)</label>
+          <input id="start_time" name="start_time" type="time" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label for="end_time" class="form-label">End Time (optional)</label>
+          <input id="end_time" name="end_time" type="time" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label for="distance_km" class="form-label">Distance (km)</label>
+          <input id="distance_km" name="distance_km" type="number" step="0.01" min="0" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label for="activity_date" class="form-label">Activity Date</label>
+          <input id="activity_date" name="activity_date" type="date" class="form-control" value="{{ today }}">
+        </div>
+        <div class="col-md-6">
+          <label for="difficulty" class="form-label">Difficulty</label>
+          <select id="difficulty" name="difficulty" class="form-select">
+            <option value="Easy">Easy</option>
+            <option value="Standard" selected>Standard</option>
+            <option value="Hard">Hard</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary w-100" type="submit">Add Activity</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="panel p-4">
+      <h2 class="h5 mb-3">Recent Activities</h2>
+      {% if activities %}
+      <div class="table-responsive">
+        <table class="table table-fitquest align-middle">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Duration</th>
+              <th>Calories</th>
+              <th>Distance</th>
+              <th>Difficulty</th>
+              <th>Source</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in activities %}
+            <tr>
+              <td>{{ item.type }}</td>
+              <td>{{ item.duration_minutes }} min</td>
+              <td>{{ item.calories or '-' }}</td>
+              <td>{{ item.distance_km or '-' }}</td>
+              <td>{{ item.difficulty or 'Standard' }}</td>
+              <td>{{ item.source }}</td>
+              <td>{{ item.activity_date }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No activity records yet.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

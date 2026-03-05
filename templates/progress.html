@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}{{ period_label }} Progress | FitQuest{% endblock %}
+{% block content %}
+<div class="progress-shell">
+  {% set period_options = [("weekly", "Weekly"), ("monthly", "Monthly"), ("yearly", "Yearly")] %}
+  <div class="d-flex justify-content-end mb-2 gap-2">
+    {% for key, label in period_options %}
+      <a
+        class="btn btn-sm progress-range-btn {% if period_key == key %}btn-primary{% else %}btn-light{% endif %}"
+        href="{{ url_for('progress', period=key) }}"
+      >
+        {{ label }}
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-3">
+      <section class="progress-card h-100">
+        <div class="metric-stack">
+          <a class="metric-pill" href="{{ url_for('calories') }}">Calories</a>
+          <a class="metric-pill" href="{{ url_for('hydration') }}">Hydration</a>
+          <a class="metric-pill" href="{{ url_for('exercise') }}">Exercise Minutes</a>
+        </div>
+
+        <div class="progress-title mt-3">Exercise Status</div>
+        {% for item in exercise_status %}
+          <div class="status-track">
+            <div class="status-line">
+              <span>{{ item.label }}</span>
+              <span>{{ item.value }}%</span>
+            </div>
+            <div class="status-bar">
+              <div class="status-bar-fill" style="width: {{ item.value }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </section>
+    </div>
+
+    <div class="col-lg-4">
+      <section class="progress-card h-100 text-center">
+        <div class="progress-title">Goal Completion</div>
+        <div class="donut-wrap" style="--percent: {{ completion_pct }};">
+          <div class="donut-inner">{{ completion_pct }}%</div>
+        </div>
+        <ul class="legend-list text-start d-inline-block mt-3">
+          <li><span class="legend-dot completed"></span>Completed</li>
+          <li><span class="legend-dot pending"></span>Not Completed</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="col-lg-5">
+      <section class="progress-card h-100">
+        <div class="progress-title">{{ period_label }} Exercise Trend</div>
+        <div class="weekly-bars">
+          {% if trend_points %}
+            {% for item in trend_points %}
+              <div
+                class="weekly-bar"
+                style="height: {{ item.pct }}%"
+                title="{{ item.title }}: {{ item.value }} min"
+              ></div>
+            {% endfor %}
+          {% else %}
+            <div class="row-sub">No activity data available for this period yet.</div>
+          {% endif %}
+        </div>
+        {% if trend_points %}
+          <div class="weekly-labels">
+            {% for item in trend_points %}
+              <span>{{ item.label }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

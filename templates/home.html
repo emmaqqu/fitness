@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}Home | FitQuest{% endblock %}
+{% block content %}
+<div class="home-shell">
+  <section class="panel p-4 home-hero mb-3">
+    <div class="home-hero-grid">
+      <div>
+        <p class="home-hero-kicker mb-1">Welcome back, {{ current_user }}</p>
+        <h1 class="home-hero-title mb-2">Level Up Your Fitness Journey</h1>
+        <p class="home-hero-copy mb-0">
+          Keep your streak going with goals, game sessions, and quick progress check-ins.
+        </p>
+      </div>
+      <div class="home-hero-actions">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('game') }}">Play Game</a>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('progress', period='weekly') }}">View Progress</a>
+        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('modify_activities') }}">Log Activity</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="home-block">
+    <div class="home-head">
+      <span>Your Goals</span>
+      <a href="{{ url_for('modify_goals') }}">Add Goal</a>
+    </div>
+    <div class="proto-list-card">
+      {% if goal_preview %}
+        {% for goal in goal_preview %}
+          {% if goal.status == 'Completed' %}
+            {% set goal_pct = 100 %}
+            {% set goal_tag = 'completed' %}
+            {% set goal_label = 'Completed' %}
+          {% elif goal.status == 'On Track' %}
+            {% set goal_pct = 70 %}
+            {% set goal_tag = 'on-track' %}
+            {% set goal_label = 'On track' %}
+          {% elif goal.status == 'Cancelled' %}
+            {% set goal_pct = 20 %}
+            {% set goal_tag = 'behind' %}
+            {% set goal_label = 'Cancelled' %}
+          {% else %}
+            {% set goal_pct = 45 %}
+            {% set goal_tag = 'behind' %}
+            {% set goal_label = 'Behind' %}
+          {% endif %}
+
+          <article class="goal-row">
+            <div class="goal-top">
+              <div class="goal-left">
+                <span class="row-dot goal {% if loop.index % 2 == 0 %}alt{% endif %}"></span>
+                <div>
+                  <div class="row-main">{{ goal.goal_type_name }} {{ goal.target_value|round(0) }} {{ goal.unit }}</div>
+                  <div class="row-sub">{{ goal.status }}</div>
+                </div>
+              </div>
+              <span class="status-pill {{ goal_tag }}">{{ goal_label }}</span>
+            </div>
+            <div class="goal-track">
+              <div class="goal-fill" style="width: {{ goal_pct }}%"></div>
+            </div>
+          </article>
+        {% endfor %}
+      {% else %}
+        <div class="goal-row">
+          <div class="row-sub">No goals yet. Add your first goal to get started.</div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="home-block">
+    <div class="home-head">
+      <span>Recent Activities</span>
+      <a href="{{ url_for('modify_activities') }}">Log New Activity</a>
+    </div>
+    <div class="proto-list-card">
+      {% if activity_preview %}
+        {% for activity in activity_preview %}
+        <article class="activity-row">
+          <div class="activity-top">
+            <div class="activity-left">
+              <span class="row-dot activity {% if loop.index % 2 == 0 %}alt{% endif %}"></span>
+                <div>
+                  <div class="row-main">{{ activity.type }}</div>
+                <div class="row-sub">{{ activity.duration_minutes }} min · {{ activity.calories or 0 }} cal · {{ activity.difficulty or 'Standard' }}</div>
+                </div>
+              </div>
+            <span class="row-sub">{{ activity.activity_date }}</span>
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+        <div class="activity-row">
+          <div class="row-sub">No activities logged yet. Use "Log New Activity".</div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="home-block">
+    <div class="home-head">
+      <span>Adaptive Challenges</span>
+      <a href="{{ url_for('exercise') }}">View Exercise Plan</a>
+    </div>
+    <div class="proto-list-card">
+      {% if adaptive_challenges %}
+        {% for item in adaptive_challenges %}
+        <article class="activity-row">
+          <div class="activity-top">
+            <div class="activity-left">
+              <span class="row-dot activity {% if loop.index % 2 == 0 %}alt{% endif %}"></span>
+              <div>
+                <div class="row-main">{{ item.title }}</div>
+                <div class="row-sub">{{ item.description }}</div>
+                <div class="row-sub">{{ item.why }}</div>
+              </div>
+            </div>
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+        <div class="activity-row">
+          <div class="row-sub">No adaptive challenges available yet.</div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

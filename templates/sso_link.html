@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}SSO Link | FitQuest{% endblock %}
+{% block content %}
+<div class="login-frame">
+  <section class="login-center-card">
+    <h1 class="login-title">Single Sign-On Ready</h1>
+    <p class="muted-text mb-3">
+      A secure one-time SSO link was generated for <strong>{{ identity }}</strong>.
+      In production this would be delivered by your identity provider.
+    </p>
+
+    <div class="mb-3">
+      <label class="form-label" for="sso-link">One-time SSO link</label>
+      <input id="sso-link" class="form-control" value="{{ sso_url }}" readonly>
+    </div>
+
+    <a class="btn login-continue w-100 mb-2" href="{{ sso_url }}">Continue with this SSO link</a>
+    <a class="btn login-alt-btn w-100" href="{{ url_for('login', next=next_target) }}">Back to Login</a>
+  </section>
+</div>
+{% endblock %}

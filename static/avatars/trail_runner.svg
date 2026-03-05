@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Trail Runner avatar">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8ce4cb"/>
+      <stop offset="100%" stop-color="#5d96df"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <path d="M28 372c88-30 136-32 220-8 70 20 112 18 236-14" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="18" opacity=".85"/>
+  <circle cx="316" cy="136" r="44" fill="#203459"/>
+  <path d="M250 208l84 16 42 52-34 26-33-40-64-8z" fill="#203459"/>
+  <path d="M264 250l44 46-26 52-40-18 22-47-58 15-11-38z" fill="#203459"/>
+  <path d="M334 286l54 47-24 32-57-37z" fill="#203459"/>
+  <path d="M304 232l-34 64-38-20 28-59z" fill="#ffd36f"/>
+</svg>

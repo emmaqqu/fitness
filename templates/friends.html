@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Friends | FitQuest{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <section class="panel p-4 mb-4">
+      <h1 class="h4 mb-3">Find Friends</h1>
+      <form method="get" class="input-group mb-3">
+        <input type="text" name="q" class="form-control" placeholder="Search username" value="{{ query }}">
+        <button class="btn btn-primary" type="submit">Search</button>
+      </form>
+
+      {% if results %}
+      <ul class="list-group list-group-flush">
+        {% for user in results %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ user.username }}</strong>
+            <div class="small muted-text">{{ user.first_name or '' }} {{ user.last_name or '' }}</div>
+          </div>
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="send">
+            <input type="hidden" name="target_username" value="{{ user.username }}">
+            <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% elif query %}
+      <p class="mb-0 muted-text">No users found for "{{ query }}".</p>
+      {% endif %}
+    </section>
+
+    <section class="panel p-4 mb-4">
+      <h2 class="h5 mb-3">Invite Links</h2>
+      <form method="post" class="mb-3">
+        <input type="hidden" name="action" value="create_link">
+        <button class="btn btn-outline-primary w-100" type="submit">Create Invite Link</button>
+      </form>
+
+      {% if latest_invite_url %}
+      <div class="mb-3">
+        <label class="form-label small mb-1" for="latest-invite-link">Latest link</label>
+        <input id="latest-invite-link" class="form-control form-control-sm" value="{{ latest_invite_url }}" readonly>
+      </div>
+      {% endif %}
+
+      {% if invite_links %}
+      <div class="d-grid gap-2">
+        {% for item in invite_links %}
+        <div class="border rounded p-2 bg-white">
+          <div class="small muted-text mb-2">Uses {{ item.use_count }}/{{ item.max_uses }} · Expires {{ item.expires_at }}</div>
+          {% if item.url %}
+          <input class="form-control form-control-sm mb-2" value="{{ item.url }}" readonly>
+          {% endif %}
+          <form method="post" class="m-0">
+            <input type="hidden" name="action" value="disable_link">
+            <input type="hidden" name="token_hash" value="{{ item.token_hash }}">
+            <button class="btn btn-sm btn-outline-danger w-100" type="submit">Disable Link</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No active invite links.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel p-4">
+      <h2 class="h5 mb-3">Pending Sent</h2>
+      {% if friend_data.outgoing %}
+      <ul class="mb-0">
+        {% for req in friend_data.outgoing %}
+        <li>{{ req.target_username }} <span class="muted-text">({{ req.created_at }})</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="mb-0 muted-text">No outgoing requests.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="panel p-4 mb-4">
+      <h2 class="h5 mb-3">Incoming Requests</h2>
+      {% if friend_data.incoming %}
+      <div class="table-responsive">
+        <table class="table table-fitquest align-middle">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for req in friend_data.incoming %}
+            <tr>
+              <td>{{ req.requester_username }}</td>
+              <td>{{ req.created_at }}</td>
+              <td>
+                <div class="d-flex gap-2">
+                  <form method="post" class="m-0">
+                    <input type="hidden" name="action" value="respond">
+                    <input type="hidden" name="friendship_id" value="{{ req.friendship_id }}">
+                    <input type="hidden" name="decision" value="accept">
+                    <button class="btn btn-sm btn-success" type="submit">Accept</button>
+                  </form>
+                  <form method="post" class="m-0">
+                    <input type="hidden" name="action" value="respond">
+                    <input type="hidden" name="friendship_id" value="{{ req.friendship_id }}">
+                    <input type="hidden" name="decision" value="reject">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Reject</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="mb-0 muted-text">No incoming requests.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel p-4">
+      <h2 class="h5 mb-3">Friends List</h2>
+      {% if friend_data.accepted %}
+      <ul class="mb-0">
+        {% for friend in friend_data.accepted %}
+        <li>{{ friend.friend_username }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="mb-0 muted-text">No accepted friends yet.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

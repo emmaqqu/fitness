@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Starter Sprite avatar">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe2a2"/>
+      <stop offset="100%" stop-color="#f4a07a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <circle cx="256" cy="186" r="78" fill="#2f355d"/>
+  <path d="M152 432c14-78 55-124 104-124s90 46 104 124H152z" fill="#2f355d"/>
+  <circle cx="226" cy="176" r="9" fill="#fff"/>
+  <circle cx="286" cy="176" r="9" fill="#fff"/>
+  <path d="M221 218c10 17 22 24 35 24s25-7 35-24" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="10"/>
+</svg>
