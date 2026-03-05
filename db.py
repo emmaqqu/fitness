@@ -57,10 +57,7 @@ HEALTH_KB = [
     },
 ]
 
-
-# -------------------------
 # Core utilities
-# -------------------------
 
 def _now() -> datetime:
     return datetime.now()
