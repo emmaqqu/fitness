@@ -70,13 +70,13 @@
           <tbody>
             {% for item in activities %}
             <tr>
-              <td>{{ item.type }}</td>
-              <td>{{ item.duration_minutes }} min</td>
-              <td>{{ item.calories or '-' }}</td>
-              <td>{{ item.distance_km or '-' }}</td>
-              <td>{{ item.difficulty or 'Standard' }}</td>
-              <td>{{ item.source }}</td>
-              <td>{{ item.activity_date }}</td>
+              <td>{{ item.Type }}</td>
+              <td>{{ item.DurationMinutes }} min</td>
+              <td>{{ item.CaloriesBurnt or '-' }}</td>
+              <td>{{ item.DistanceKm or '-' }}</td>
+              <td>{{ item.Difficulty or 'Standard' }}</td>
+              <td>{{ item.Source }}</td>
+              <td>{{ item.ActivityDate }}</td>
             </tr>
             {% endfor %}
           </tbody>

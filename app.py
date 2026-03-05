@@ -279,9 +279,9 @@ AVATAR_VISUALS = {
 def _decorate_avatar_item(item: dict | None) -> dict | None:
     if not item:
         return None
-    avatar_name = str(item.get("avatar_name") or "")
+    avatar_name = str(item.get("AvatarName") or "")
     visual = AVATAR_VISUALS.get(avatar_name, DEFAULT_AVATAR_VISUAL)
-    # Keep NormalizedRecord behavior so both snake_case and PascalCase keys resolve in templates.
+    # Attach presentation-only fields used by the templates.
     decorated = item
     decorated["art_file"] = visual["asset"]
     decorated["theme_class"] = visual["theme_class"]
@@ -578,7 +578,7 @@ def _record_game_activity(username: str, card: dict, difficulty: str = "Standard
         username=username,
         activity_type=card["exercise_name"],
         duration_minutes=card["minutes"],
-        calories=card["calories"],
+        calories_burnt=card["calories"],
         distance_km=None,
         activity_date=timestamp,
         source="Game",
@@ -1272,8 +1272,8 @@ def _coop_lobby_context(username: str) -> dict:
         "xp_earned": 0,
         "session_result": None,
         "coop_friends": list_coop_friends(username),
-        "incoming_invites": invites["incoming"],
-        "outgoing_invites": invites["outgoing"],
+        "incoming_invites": invites["Incoming"],
+        "outgoing_invites": invites["Outgoing"],
     }
 
 
@@ -1282,21 +1282,21 @@ def _build_exercise_goal_suggestions(
     goal_types: list[dict],
 ) -> list[dict]:
     goal_type_map = {
-        str(goal_type["goal_type_name"]).strip().lower(): goal_type
+        str(goal_type["GoalTypeName"]).strip().lower(): goal_type
         for goal_type in goal_types
     }
     suggestions: list[dict] = []
 
     if activities:
         active_days = {
-            str(item["activity_date"])[:10]
+            str(item["ActivityDate"])[:10]
             for item in activities
-            if item.get("activity_date")
+            if item.get("ActivityDate")
         }
         day_count = max(1, len(active_days))
-        total_minutes = sum(int(item.get("duration_minutes") or 0) for item in activities)
-        total_calories = sum(int(item.get("calories") or 0) for item in activities)
-        total_distance = sum(float(item.get("distance_km") or 0.0) for item in activities)
+        total_minutes = sum(int(item.get("DurationMinutes") or 0) for item in activities)
+        total_calories = sum(int(item.get("CaloriesBurnt") or 0) for item in activities)
+        total_distance = sum(float(item.get("DistanceKm") or 0.0) for item in activities)
     else:
         day_count = 1
         total_minutes = 0
@@ -1318,9 +1318,9 @@ def _build_exercise_goal_suggestions(
         weekly_minutes_target = _round_to_step(avg_daily_minutes * 7, 5) if total_minutes > 0 else 120
         suggestions.append(
             {
-                "goal_type_id": int(exercise_type["goal_type_id"]),
-                "goal_type_name": exercise_type["goal_type_name"],
-                "unit": exercise_type["unit"],
+                "goal_type_id": int(exercise_type["GoalTypeID"]),
+                "goal_type_name": exercise_type["GoalTypeName"],
+                "unit": exercise_type["Unit"],
                 "target_value": float(weekly_minutes_target),
                 "target_display": str(weekly_minutes_target),
                 "title": "Weekly Exercise Goal",
@@ -1333,9 +1333,9 @@ def _build_exercise_goal_suggestions(
         weekly_calorie_target = _round_to_step(avg_daily_calories * 7, 50) if total_calories > 0 else 1500
         suggestions.append(
             {
-                "goal_type_id": int(calories_type["goal_type_id"]),
-                "goal_type_name": calories_type["goal_type_name"],
-                "unit": calories_type["unit"],
+                "goal_type_id": int(calories_type["GoalTypeID"]),
+                "goal_type_name": calories_type["GoalTypeName"],
+                "unit": calories_type["Unit"],
                 "target_value": float(weekly_calorie_target),
                 "target_display": str(weekly_calorie_target),
                 "title": "Weekly Calories Burn Goal",
@@ -1351,9 +1351,9 @@ def _build_exercise_goal_suggestions(
             weekly_distance_target = 10.0
         suggestions.append(
             {
-                "goal_type_id": int(distance_type["goal_type_id"]),
-                "goal_type_name": distance_type["goal_type_name"],
-                "unit": distance_type["unit"],
+                "goal_type_id": int(distance_type["GoalTypeID"]),
+                "goal_type_name": distance_type["GoalTypeName"],
+                "unit": distance_type["Unit"],
                 "target_value": float(weekly_distance_target),
                 "target_display": f"{weekly_distance_target:.1f}",
                 "title": "Weekly Distance Goal",
@@ -1369,11 +1369,11 @@ def _build_category_exercise_suggestions(
     activities: list[dict],
 ) -> list[dict]:
     active_goal_names = {
-        str(goal.get("goal_type_name") or "").strip().lower()
+        str(goal.get("GoalTypeName") or "").strip().lower()
         for goal in goals
-        if goal.get("status") in ("Active", "On Track")
+        if goal.get("GoalStatus") in ("Active", "On Track")
     }
-    recent_minutes = sum(int(item.get("duration_minutes") or 0) for item in activities[:14])
+    recent_minutes = sum(int(item.get("DurationMinutes") or 0) for item in activities[:14])
     base_duration = 15 if recent_minutes < 180 else 25
 
     focus_tags: set[str] = set()
@@ -1434,7 +1434,7 @@ def _build_category_exercise_suggestions(
 
 def _build_adaptive_challenges(activities: list[dict]) -> list[dict]:
     recent = activities[:21]
-    total_minutes = sum(int(item.get("duration_minutes") or 0) for item in recent)
+    total_minutes = sum(int(item.get("DurationMinutes") or 0) for item in recent)
     sessions = max(1, len(recent))
     avg_session = max(10, int(round(total_minutes / sessions)))
     weekly_target = max(90, int(round((total_minutes / 3) / 5) * 5))
@@ -1542,10 +1542,10 @@ def _progress_context(period_key: str) -> dict:
     """Prepare server-rendered progress data for a selected time period."""
     period_key, days, period_label = _resolve_progress_period(period_key)
     dataset = get_progress_dataset(_username(), days)
-    labels = dataset["labels"]
-    calories = dataset["calories"]
-    hydration = dataset["hydration"]
-    exercise = dataset["exercise"]
+    labels = dataset["Labels"]
+    calories = dataset["Calories"]
+    hydration = dataset["Hydration"]
+    exercise = dataset["Exercise"]
 
     max_calories = max(calories) if calories else 1
     max_hydration = max(hydration) if hydration else 1
@@ -1580,7 +1580,7 @@ def _progress_context(period_key: str) -> dict:
     }
 
     goals = list_goals(_username())
-    completed_goals = [goal for goal in goals if goal["status"] == "Completed"]
+    completed_goals = [goal for goal in goals if goal["GoalStatus"] == "Completed"]
     completion_pct = int(round((len(completed_goals) / len(goals)) * 100)) if goals else 0
 
     trend_points = _build_period_trend(rows, period_key)
@@ -1705,8 +1705,8 @@ def sso_verify():
         return redirect(url_for("login"))
 
     session.clear()
-    session["username"] = user["username"]
-    log_action(user["username"], "Successful SSO login")
+    session["username"] = user["Username"]
+    log_action(user["Username"], "Successful SSO login")
     flash("SSO login successful.", "success")
     return redirect(_post_login_redirect_target())
 
@@ -1726,8 +1726,8 @@ def login():
         user, error_message = authenticate_user(identity, password)
         if user:
             session.clear()
-            session["username"] = user["username"]
-            log_action(user["username"], "Successful login")
+            session["username"] = user["Username"]
+            log_action(user["Username"], "Successful login")
             flash("Login successful.", "success")
             return redirect(_post_login_redirect_target())
 
@@ -1752,14 +1752,14 @@ def home():
     summary = get_home_summary(username)
     goals = list_goals(username)
     recent_for_challenges = list_activities(username, 30)
-    active_goal_preview = [goal for goal in goals if goal["status"] in ("Active", "On Track")][:2]
+    active_goal_preview = [goal for goal in goals if goal["GoalStatus"] in ("Active", "On Track")][:2]
     goal_preview = active_goal_preview if active_goal_preview else goals[:2]
 
     return render_template(
         "home.html",
         summary=summary,
         goal_preview=goal_preview,
-        activity_preview=summary["recent_activities"][:2],
+        activity_preview=summary["RecentActivities"][:2],
         adaptive_challenges=_build_adaptive_challenges(recent_for_challenges),
     )
 
@@ -1768,7 +1768,7 @@ def home():
 def modify_goals():
     username = _username()
     goal_types = list_goal_types()
-    valid_goal_type_ids = {int(item["goal_type_id"]) for item in goal_types}
+    valid_goal_type_ids = {int(item["GoalTypeID"]) for item in goal_types}
 
     if request.method == "POST":
         action = request.form.get("action", "add")
@@ -1851,7 +1851,7 @@ def modify_activities():
                 username=username,
                 activity_type=activity_type,
                 duration_minutes=duration_minutes,
-                calories=calories,
+                calories_burnt=calories,
                 distance_km=distance_km,
                 activity_date=activity_date,
                 source=source,
@@ -1867,8 +1867,8 @@ def modify_activities():
                 ),
             )
             level_suffix = ""
-            if xp_state.get("leveled_up"):
-                level_suffix = f" Level up! You are now level {xp_state['level']}."
+            if xp_state.get("LeveledUp"):
+                level_suffix = f" Level up! You are now level {xp_state['Level']}."
             flash(
                 f"Activity logged ({duration_minutes} min). +{xp_earned} XP earned for {difficulty} difficulty.{level_suffix}",
                 "success",
@@ -1951,7 +1951,7 @@ def game():
 
                     difficulty = session.get("game_difficulty", "Standard")
                     initial_state = _new_coop_match_state(
-                        player_one=invite["from_username"],
+                        player_one=invite["FromUsername"],
                         player_two=username,
                         difficulty=difficulty,
                     )
@@ -1960,7 +1960,7 @@ def game():
                         invite_id=invite_id,
                         decision="accept",
                         initial_state_json=json.dumps(initial_state),
-                        turn_username=invite["from_username"],
+                        turn_username=invite["FromUsername"],
                     )
                 else:
                     ok, message, _match_id = respond_coop_invite(
@@ -1992,12 +1992,12 @@ def game():
                     match_id = 0
 
                 match_row = get_coop_match_for_user(username, match_id)
-                if not match_row or match_row.get("status") != "Active":
+                if not match_row or match_row.get("MatchStatus") != "Active":
                     flash("Active co-op match not found.", "danger")
                     return redirect(url_for("game"))
 
                 try:
-                    coop_state = json.loads(match_row["state_json"])
+                    coop_state = json.loads(match_row["StateJson"])
                 except json.JSONDecodeError:
                     flash("Co-op match state is corrupted.", "danger")
                     return redirect(url_for("game"))
@@ -2039,24 +2039,24 @@ def game():
                     return redirect(url_for("game"))
 
                 try:
-                    current_state = json.loads(active_match["state_json"])
+                    current_state = json.loads(active_match["StateJson"])
                 except json.JSONDecodeError:
                     flash("Could not reset co-op match state.", "danger")
                     return redirect(url_for("game"))
 
                 new_state = _new_coop_match_state(
-                    player_one=active_match["player_one"],
-                    player_two=active_match["player_two"],
+                    player_one=active_match["PlayerOne"],
+                    player_two=active_match["PlayerTwo"],
                     difficulty=current_state.get("difficulty", session.get("game_difficulty", "Standard")),
                 )
                 update_coop_match_state(
-                    match_id=int(active_match["match_id"]),
+                    match_id=int(active_match["MatchID"]),
                     state_json=json.dumps(new_state),
                     turn_username=new_state.get("turn_username"),
                     status="Active",
                     winner=None,
                 )
-                log_action(username, f"Reset co-op match {active_match['match_id']}")
+                log_action(username, f"Reset co-op match {active_match['MatchID']}")
                 return redirect(url_for("game"))
 
             return redirect(url_for("game"))
@@ -2088,14 +2088,14 @@ def game():
         active_match = get_active_coop_match_for_user(username)
         if active_match:
             try:
-                state = json.loads(active_match["state_json"])
+                state = json.loads(active_match["StateJson"])
             except json.JSONDecodeError:
                 flash("Could not load co-op match state.", "danger")
                 return render_template("game.html", game=_coop_lobby_context(username))
 
             return render_template(
                 "game.html",
-                game=_build_coop_match_context(username, int(active_match["match_id"]), state),
+                game=_build_coop_match_context(username, int(active_match["MatchID"]), state),
             )
 
         return render_template("game.html", game=_coop_lobby_context(username))
@@ -2145,9 +2145,9 @@ def search():
     if query:
         search_payload = search_health_topics(query)
     else:
-        search_payload = {"results": [], "algorithm": "none", "note": "Enter a topic to search."}
+        search_payload = {"Results": [], "Algorithm": "none", "Note": "Enter a topic to search."}
 
-    results = search_payload["results"]
+    results = search_payload["Results"]
     health = get_health(username)
     return render_template(
         "search.html",
@@ -2232,7 +2232,7 @@ def hydration():
 def exercise():
     username = _username()
     goal_types = list_goal_types()
-    valid_goal_type_ids = {int(item["goal_type_id"]) for item in goal_types}
+    valid_goal_type_ids = {int(item["GoalTypeID"]) for item in goal_types}
 
     if request.method == "POST":
         action = request.form.get("action", "")
@@ -2264,9 +2264,9 @@ def exercise():
     goals = list_goals(username)
     suggestions = _build_exercise_goal_suggestions(activities, goal_types)
     active_goal_type_ids = {
-        int(goal["goal_type_id"])
+        int(goal["GoalTypeID"])
         for goal in goals
-        if goal.get("status") in ("Active", "On Track")
+        if goal.get("GoalStatus") in ("Active", "On Track")
     }
     for item in suggestions:
         item["already_active"] = int(item["goal_type_id"]) in active_goal_type_ids
@@ -2293,12 +2293,12 @@ def friends():
             flash(message, "success" if ok else "danger")
         elif action == "create_link":
             payload = create_friend_invite_link(username=username)
-            invite_url = url_for("accept_friend_invite", token=payload["token"], _external=True)
+            invite_url = url_for("accept_friend_invite", token=payload["Token"], _external=True)
             session["latest_friend_invite_url"] = invite_url
             log_action(username, "Created friend invite link")
             flash("Invite link created.", "success")
         elif action == "disable_link":
-            token_hash = request.form.get("token_hash", "").strip()
+            token_hash = request.form.get("friend_invite_link_key", "").strip()
             ok, message = disable_friend_invite_link(username, token_hash)
             log_action(username, f"Disable friend invite link: {message}")
             flash(message, "success" if ok else "danger")
@@ -2321,7 +2321,7 @@ def friends():
     friend_data = get_friend_data(username)
     invite_links = list_friend_invite_links(username)
     for item in invite_links:
-        public_token = str(item.get("public_token") or "").strip()
+        public_token = str(item.get("PublicToken") or "").strip()
         item["url"] = url_for("accept_friend_invite", token=public_token, _external=True) if public_token else ""
     return render_template(
         "friends.html",

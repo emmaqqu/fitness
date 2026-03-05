@@ -11,7 +11,7 @@
           <label class="form-label" for="goal_type_id">Goal Type</label>
           <select id="goal_type_id" name="goal_type_id" class="form-select" required>
             {% for item in goal_types %}
-            <option value="{{ item.goal_type_id }}">{{ item.goal_type_name }} ({{ item.unit }})</option>
+            <option value="{{ item.GoalTypeID }}">{{ item.GoalTypeName }} ({{ item.Unit }})</option>
             {% endfor %}
           </select>
         </div>
@@ -53,18 +53,18 @@
           <tbody>
             {% for goal in goals %}
             <tr>
-              <td>{{ goal.goal_type_name }}</td>
-              <td>{{ goal.target_value }} {{ goal.unit }}</td>
-              <td>{{ goal.start_date }}</td>
-              <td>{{ goal.end_date or '-' }}</td>
-              <td>{{ goal.status }}</td>
+              <td>{{ goal.GoalTypeName }}</td>
+              <td>{{ goal.TargetValue }} {{ goal.Unit }}</td>
+              <td>{{ goal.StartDate }}</td>
+              <td>{{ goal.EndDate or '-' }}</td>
+              <td>{{ goal.GoalStatus }}</td>
               <td>
                 <form method="post" class="d-flex gap-2">
                   <input type="hidden" name="action" value="status">
-                  <input type="hidden" name="goal_id" value="{{ goal.goal_id }}">
+                  <input type="hidden" name="goal_id" value="{{ goal.GoalID }}">
                   <select name="status" class="form-select form-select-sm" aria-label="status">
                     {% for option in ['Active', 'On Track', 'Completed', 'Cancelled'] %}
-                    <option value="{{ option }}" {% if option == goal.status %}selected{% endif %}>{{ option }}</option>
+                    <option value="{{ option }}" {% if option == goal.GoalStatus %}selected{% endif %}>{{ option }}</option>
                     {% endfor %}
                   </select>
                   <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>

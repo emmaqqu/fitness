@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -17,17 +16,6 @@ ERROR_LOG_PATH = Path("instance/errors.log")
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 DATE_FORMAT = "%Y-%m-%d"
 WORKOUT_DIFFICULTIES = {"Easy", "Standard", "Hard"}
-PASCAL_ACRONYMS = {
-    "api": "API",
-    "id": "ID",
-    "ip": "IP",
-    "sso": "SSO",
-    "ui": "UI",
-    "uid": "UID",
-    "url": "URL",
-    "uuid": "UUID",
-    "xp": "XP",
-}
 
 HEALTH_KB = [
     {
@@ -92,105 +80,6 @@ def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, 
     conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
-def _rename_column_if_needed(
-    conn: sqlite3.Connection,
-    table_name: str,
-    old_name: str,
-    new_name: str,
-) -> None:
-    columns = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    existing = {str(column["name"]).lower() for column in columns}
-    if new_name.lower() in existing or old_name.lower() not in existing:
-        return
-    conn.execute(f"ALTER TABLE {table_name} RENAME COLUMN {old_name} TO {new_name}")
-
-
-def _migrate_legacy_schema(conn: sqlite3.Connection) -> None:
-    rename_operations = [
-        ("USER", "first_name", "FirstName"),
-        ("USER", "last_name", "LastName"),
-        ("USER", "phone_num", "PhoneNum"),
-        ("USER", "date_joined", "DateJoined"),
-        ("USER", "failed_login_attempts", "FailedLoginAttempts"),
-        ("USER", "locked_until", "LockedUntil"),
-        ("AVATAR", "avatar_id", "AvatarID"),
-        ("AVATAR", "avatar_name", "AvatarName"),
-        ("AVATAR", "unlock_level", "UnlockLevel"),
-        ("PROFILE", "profile_id", "ProfileID"),
-        ("PROFILE", "avatar_id", "AvatarID"),
-        ("PROFILE", "ProfileAvatarKey", "AvatarID"),
-        ("ACTIVITIES", "activity_id", "ActivityID"),
-        ("ACTIVITIES", "duration_minutes", "DurationMinutes"),
-        ("ACTIVITIES", "distance_km", "DistanceKm"),
-        ("ACTIVITIES", "activity_date", "ActivityDate"),
-        ("CALORIES", "log_id", "LogID"),
-        ("CALORIES", "calorie_intake", "CalorieIntake"),
-        ("CALORIES", "log_date", "LogDate"),
-        ("HYDRATION", "entry_id", "EntryID"),
-        ("HYDRATION", "hydration_intake", "HydrationIntake"),
-        ("HYDRATION", "entry_date", "EntryDate"),
-        ("GAME_MODES", "mode_id", "ModeID"),
-        ("GAME_MODES", "mode_name", "ModeName"),
-        ("GAME", "session_id", "SessionID"),
-        ("GAME", "mode_id", "ModeID"),
-        ("GAME", "GameModeKey", "ModeID"),
-        ("GAME", "xp_earned", "XPEarned"),
-        ("GAME", "Winner", "GameWinner"),
-        ("GAME", "start_time", "StartTime"),
-        ("GAME", "end_time", "EndTime"),
-        ("GAME_PLAYERS", "players_id", "PlayersID"),
-        ("GAME_PLAYERS", "session_id", "SessionID"),
-        ("GAME_PLAYERS", "PlayerSessionKey", "SessionID"),
-        ("FRIENDS", "friendship_id", "FriendshipID"),
-        ("FRIENDS", "RequesterUsername", "RequesterUsername"),
-        ("FRIENDS", "TargetUsername", "TargetUsername"),
-        ("FRIENDS", "request_status", "RequestStatus"),
-        ("FRIENDS", "created_at", "FriendshipCreatedAt"),
-        ("COOP_INVITES", "from_username", "from_username"),
-        ("COOP_INVITES", "to_username", "to_username"),
-        ("COOP_INVITES", "Status", "InviteStatus"),
-        ("COOP_INVITES", "created_at", "InviteCreatedAt"),
-        ("COOP_INVITES", "responded_at", "InviteRespondedAt"),
-        ("COOP_MATCHES", "turn_username", "turn_username"),
-        ("COOP_MATCHES", "Status", "MatchStatus"),
-        ("COOP_MATCHES", "Winner", "MatchWinner"),
-        ("COOP_MATCHES", "created_at", "MatchCreatedAt"),
-        ("COOP_MATCHES", "updated_at", "MatchUpdatedAt"),
-        ("HEALTH", "health_id", "HealthID"),
-        ("HEALTH", "weight_kg", "WeightKg"),
-        ("HEALTH", "height_cm", "HeightCm"),
-        ("HEALTH", "activity_level", "ActivityLevel"),
-        ("HEALTH", "overall_health", "OverallHealth"),
-        ("GOAL_TYPE", "goal_type_id", "GoalTypeID"),
-        ("GOAL_TYPE", "goal_type_name", "GoalTypeName"),
-        ("GOALS", "goal_id", "GoalID"),
-        ("GOALS", "goal_type_id", "GoalTypeID"),
-        ("GOALS", "GoalTypeKey", "GoalTypeID"),
-        ("GOALS", "target_value", "TargetValue"),
-        ("GOALS", "start_date", "StartDate"),
-        ("GOALS", "end_date", "EndDate"),
-        ("GOALS", "Status", "GoalStatus"),
-        ("SSO_TOKENS", "created_at", "SsoCreatedAt"),
-        ("SSO_TOKENS", "expires_at", "SsoExpiresAt"),
-        ("SSO_TOKENS", "used_at", "SsoUsedAt"),
-        ("SSO_TOKENS", "token_hash", "SsoTokenKey"),
-        ("FRIEND_INVITE_LINKS", "created_at", "LinkCreatedAt"),
-        ("FRIEND_INVITE_LINKS", "expires_at", "LinkExpiresAt"),
-        ("FRIEND_INVITE_LINKS", "token_hash", "FriendInviteLinkKey"),
-    ]
-
-    for table_name, old_name, new_name in rename_operations:
-        _rename_column_if_needed(conn, table_name, old_name, new_name)
-
-
-def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND lower(name) = lower(?) LIMIT 1",
-        (table_name,),
-    ).fetchone()
-    return row is not None
-
-
 @contextmanager
 def db_session():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -206,103 +95,8 @@ def db_session():
     finally:
         conn.close()
 
-def _snake_key(key: str) -> str:
-    key = str(key).strip()
-    if not key:
-        return key
-    converted = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", key)
-    converted = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", converted)
-    converted = converted.replace("-", "_").lower()
-    while "__" in converted:
-        converted = converted.replace("__", "_")
-    return converted
-
-
-def _pascal_key(key: str) -> str:
-    snake_key = _snake_key(key)
-    if not snake_key:
-        return snake_key
-    parts = [part for part in snake_key.split("_") if part]
-    converted_parts = [PASCAL_ACRONYMS.get(part.lower(), part[:1].upper() + part[1:]) for part in parts]
-    return "".join(converted_parts)
-
-
-class NormalizedRecord(dict):
-    def __init__(self, record: dict[str, Any]):
-        super().__init__()
-        self._alias_map: dict[str, str] = {}
-        for key, value in record.items():
-            self._set_with_aliases(str(key), value)
-
-    def _register_alias(self, alias: str, canonical: str) -> None:
-        cleaned = str(alias).strip()
-        if not cleaned:
-            return
-        self._alias_map[cleaned] = canonical
-
-    def _set_with_aliases(self, key: str, value: Any) -> None:
-        canonical = _pascal_key(key)
-        dict.__setitem__(self, canonical, value)
-
-        snake = _snake_key(key)
-        lower = key.lower()
-        canonical_snake = _snake_key(canonical)
-        canonical_lower = canonical.lower()
-
-        self._register_alias(key, canonical)
-        self._register_alias(lower, canonical)
-        self._register_alias(snake, canonical)
-        self._register_alias(canonical, canonical)
-        self._register_alias(canonical_lower, canonical)
-        self._register_alias(canonical_snake, canonical)
-
-    def _resolve_key(self, key: Any) -> str:
-        lookup = str(key)
-        if dict.__contains__(self, lookup):
-            return lookup
-
-        direct = self._alias_map.get(lookup)
-        if direct:
-            return direct
-
-        lower = lookup.lower()
-        direct = self._alias_map.get(lower)
-        if direct:
-            return direct
-
-        snake = _snake_key(lookup)
-        direct = self._alias_map.get(snake)
-        if direct:
-            return direct
-
-        pascal = _pascal_key(lookup)
-        if dict.__contains__(self, pascal):
-            return pascal
-
-        return lookup
-
-    def __getitem__(self, key: Any) -> Any:
-        return dict.__getitem__(self, self._resolve_key(key))
-
-    def get(self, key: Any, default: Any = None) -> Any:
-        resolved = self._resolve_key(key)
-        if dict.__contains__(self, resolved):
-            return dict.get(self, resolved, default)
-        return default
-
-    def __contains__(self, key: object) -> bool:
-        try:
-            resolved = self._resolve_key(key)
-        except Exception:
-            return False
-        return dict.__contains__(self, resolved)
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        self._set_with_aliases(str(key), value)
-
-
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
-    return NormalizedRecord(record)
+    return dict(record)
 
 
 def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
@@ -315,12 +109,13 @@ def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
 
 def init_db() -> None:
     with db_session() as conn:
+        # Keep schema definitions centralized so new installs start with consistent PascalCase fields.
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS USER (
                 Username TEXT PRIMARY KEY,
                 Email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
+                PasswordHash TEXT NOT NULL,
                 FirstName TEXT,
                 LastName TEXT,
                 PhoneNum TEXT,
@@ -355,6 +150,7 @@ def init_db() -> None:
                 DistanceKm REAL,
                 ActivityDate TEXT NOT NULL,
                 Source TEXT NOT NULL,
+                Difficulty TEXT NOT NULL DEFAULT 'Standard',
                 FOREIGN KEY (Username) REFERENCES USER(Username) ON DELETE CASCADE
             );
 
@@ -409,28 +205,28 @@ def init_db() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS COOP_INVITES (
-                invite_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                from_username TEXT NOT NULL,
-                to_username TEXT NOT NULL,
+                InviteID INTEGER PRIMARY KEY AUTOINCREMENT,
+                FromUsername TEXT NOT NULL,
+                ToUsername TEXT NOT NULL,
                 InviteStatus TEXT NOT NULL CHECK(InviteStatus IN ('Pending', 'Accepted', 'Declined', 'Cancelled')),
                 InviteCreatedAt TEXT NOT NULL,
                 InviteRespondedAt TEXT,
-                FOREIGN KEY (from_username) REFERENCES USER(Username) ON DELETE CASCADE,
-                FOREIGN KEY (to_username) REFERENCES USER(Username) ON DELETE CASCADE
+                FOREIGN KEY (FromUsername) REFERENCES USER(Username) ON DELETE CASCADE,
+                FOREIGN KEY (ToUsername) REFERENCES USER(Username) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS COOP_MATCHES (
-                match_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                player_one TEXT NOT NULL,
-                player_two TEXT NOT NULL,
-                turn_username TEXT NOT NULL,
-                state_json TEXT NOT NULL,
+                MatchID INTEGER PRIMARY KEY AUTOINCREMENT,
+                PlayerOne TEXT NOT NULL,
+                PlayerTwo TEXT NOT NULL,
+                TurnUsername TEXT NOT NULL,
+                StateJson TEXT NOT NULL,
                 MatchStatus TEXT NOT NULL CHECK(MatchStatus IN ('Active', 'Finished', 'Abandoned')),
                 MatchWinner TEXT,
                 MatchCreatedAt TEXT NOT NULL,
                 MatchUpdatedAt TEXT NOT NULL,
-                FOREIGN KEY (player_one) REFERENCES USER(Username) ON DELETE CASCADE,
-                FOREIGN KEY (player_two) REFERENCES USER(Username) ON DELETE CASCADE
+                FOREIGN KEY (PlayerOne) REFERENCES USER(Username) ON DELETE CASCADE,
+                FOREIGN KEY (PlayerTwo) REFERENCES USER(Username) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS SSO_TOKENS (
@@ -444,14 +240,14 @@ def init_db() -> None:
 
             CREATE TABLE IF NOT EXISTS FRIEND_INVITE_LINKS (
                 FriendInviteLinkKey TEXT PRIMARY KEY,
-                public_token TEXT NOT NULL,
-                inviter_username TEXT NOT NULL,
+                PublicToken TEXT NOT NULL,
+                InviterUsername TEXT NOT NULL,
                 LinkCreatedAt TEXT NOT NULL,
                 LinkExpiresAt TEXT NOT NULL,
-                use_count INTEGER NOT NULL DEFAULT 0,
-                max_uses INTEGER NOT NULL DEFAULT 25,
-                is_active INTEGER NOT NULL DEFAULT 1,
-                FOREIGN KEY (inviter_username) REFERENCES USER(Username) ON DELETE CASCADE
+                UseCount INTEGER NOT NULL DEFAULT 0,
+                MaxUses INTEGER NOT NULL DEFAULT 25,
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (InviterUsername) REFERENCES USER(Username) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS HEALTH (
@@ -463,6 +259,9 @@ def init_db() -> None:
                 HeightCm REAL,
                 ActivityLevel TEXT,
                 OverallHealth TEXT,
+                HealthConditions TEXT,
+                DietProfile TEXT,
+                Climate TEXT,
                 Mood TEXT,
                 FOREIGN KEY (Username) REFERENCES USER(Username) ON DELETE CASCADE
             );
@@ -487,62 +286,18 @@ def init_db() -> None:
             """
         )
 
-        _migrate_legacy_schema(conn)
-
-        if _table_exists(conn, "users"):
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO USER (
-                    Username, Email, password_hash, FirstName, LastName, PhoneNum, DateJoined,
-                    FailedLoginAttempts, LockedUntil
-                )
-                SELECT
-                    username, email, password_hash, first_name, last_name, phone_num, date_joined,
-                    failed_login_attempts, locked_until
-                FROM users
-                """
-            )
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO users (
-                    username, email, password_hash, first_name, last_name, phone_num, date_joined,
-                    failed_login_attempts, locked_until
-                )
-                SELECT
-                    Username, Email, password_hash, FirstName, LastName, PhoneNum, DateJoined,
-                    FailedLoginAttempts, LockedUntil
-                FROM USER
-                """
-            )
-
-        if _table_exists(conn, "game_sessions"):
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO GAME (SessionID, ModeID, XPEarned, GameWinner, StartTime, EndTime)
-                SELECT session_id, mode_id, xp_earned, winner, start_time, end_time
-                FROM game_sessions
-                """
-            )
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO game_sessions (session_id, mode_id, xp_earned, winner, start_time, end_time)
-                SELECT SessionID, ModeID, XPEarned, GameWinner, StartTime, EndTime
-                FROM GAME
-                """
-            )
-
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_sso_tokens_Username ON SSO_TOKENS(Username)"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_friend_links_inviter ON FRIEND_INVITE_LINKS(inviter_username, LinkCreatedAt)"
+            "CREATE INDEX IF NOT EXISTS idx_friend_links_inviter ON FRIEND_INVITE_LINKS(InviterUsername, LinkCreatedAt)"
         )
-
-        _ensure_column(conn, "activities", "difficulty", "TEXT NOT NULL DEFAULT 'Standard'")
-        _ensure_column(conn, "FRIEND_INVITE_LINKS", "public_token", "TEXT")
-        _ensure_column(conn, "health", "health_conditions", "TEXT")
-        _ensure_column(conn, "health", "diet_profile", "TEXT")
-        _ensure_column(conn, "health", "climate", "TEXT")
+        # Keep additive migrations small and explicit for existing databases.
+        _ensure_column(conn, "ACTIVITIES", "Difficulty", "TEXT NOT NULL DEFAULT 'Standard'")
+        _ensure_column(conn, "FRIEND_INVITE_LINKS", "PublicToken", "TEXT")
+        _ensure_column(conn, "HEALTH", "HealthConditions", "TEXT")
+        _ensure_column(conn, "HEALTH", "DietProfile", "TEXT")
+        _ensure_column(conn, "HEALTH", "Climate", "TEXT")
 
         avatar_rows = [
             ("Starter Sprite", 1, "avatar_starter.png"),
@@ -555,7 +310,7 @@ def init_db() -> None:
             avatar_rows,
         )
 
-        goal_Type_rows = [
+        goal_type_rows = [
             ("Calories", "kcal"),
             ("Hydration", "litres"),
             ("Exercise", "minutes"),
@@ -563,7 +318,7 @@ def init_db() -> None:
         ]
         conn.executemany(
             "INSERT OR IGNORE INTO GOAL_TYPE (GoalTypeName, Unit) VALUES (?, ?)",
-            goal_Type_rows,
+            goal_type_rows,
         )
 
         mode_rows = [("Solo",), ("Co-op",)]
@@ -577,16 +332,16 @@ def init_db() -> None:
 # Logging
 # -------------------------
 
-def log_action(Username: str | None, action: str) -> None:
+def log_action(username: str | None, action: str) -> None:
     ACTION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    actor = Username or "ANONYMOUS"
+    actor = username or "ANONYMOUS"
     with ACTION_LOG_PATH.open("a", encoding="utf-8") as log_file:
         log_file.write(f"{_now_str()} | {actor} | {action}\n")
 
 
-def log_error(Username: str | None, error_text: str) -> None:
+def log_error(username: str | None, error_text: str) -> None:
     ERROR_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    actor = Username or "ANONYMOUS"
+    actor = username or "ANONYMOUS"
     payload = error_text.strip().replace("\n", "\\n")
     with ERROR_LOG_PATH.open("a", encoding="utf-8") as log_file:
         log_file.write(f"{_now_str()} | {actor} | {payload}\n")
@@ -597,46 +352,35 @@ def log_error(Username: str | None, error_text: str) -> None:
 # -------------------------
 
 def create_user(
-    Username: str,
-    Email: str,
-    Password: str,
-    FirstName: str | None = None,
-    LastName: str | None = None,
-    PhoneNum: str | None = None,
+    username: str,
+    email: str,
+    password: str,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    phone_num: str | None = None,
 ) -> None:
-    password_hash = generate_password_hash(Password, method="pbkdf2:sha256")
-    DateJoined = _today_str()
+    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+    date_joined = _today_str()
 
     with db_session() as conn:
         conn.execute(
             """
-            INSERT INTO USER (Username, Email, password_hash, FirstName, LastName, PhoneNum, DateJoined)
+            INSERT INTO USER (Username, Email, PasswordHash, FirstName, LastName, PhoneNum, DateJoined)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (Username, Email, password_hash, FirstName, LastName, PhoneNum, DateJoined),
+            (username, email, password_hash, first_name, last_name, phone_num, date_joined),
         )
 
-        if _table_exists(conn, "users"):
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO users (
-                    username, email, password_hash, first_name, last_name, phone_num, date_joined
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (Username, Email, password_hash, FirstName, LastName, PhoneNum, DateJoined),
-            )
-
-        starter_avatar = conn.execute(
+        starter_avatar_row = conn.execute(
             "SELECT AvatarID FROM AVATAR ORDER BY UnlockLevel ASC, AvatarID ASC LIMIT 1"
         ).fetchone()
-        AvatarID = starter_avatar["AvatarID"] if starter_avatar else None
+        starter_avatar_id = starter_avatar_row["AvatarID"] if starter_avatar_row else None
 
         conn.execute(
             "INSERT INTO PROFILE (Username, AvatarID, Level, XP) VALUES (?, ?, 1, 0)",
-            (Username, AvatarID),
+            (username, starter_avatar_id),
         )
-        conn.execute("INSERT INTO HEALTH (Username) VALUES (?)", (Username,))
+        conn.execute("INSERT INTO HEALTH (Username) VALUES (?)", (username,))
 
 
 def get_user_by_identity(identity: str) -> dict[str, Any] | None:
@@ -645,21 +389,21 @@ def get_user_by_identity(identity: str) -> dict[str, Any] | None:
         return None
 
     with db_session() as conn:
-        by_Username = conn.execute(
+        by_username = conn.execute(
             "SELECT * FROM USER WHERE lower(Username) = ?",
             (lookup,),
         ).fetchone()
-        if by_Username:
-            return _normalize_record(dict(by_Username))
+        if by_username:
+            return _normalize_record(dict(by_username))
 
-        by_Email = conn.execute(
+        by_email = conn.execute(
             "SELECT * FROM USER WHERE lower(Email) = ?",
             (lookup,),
         ).fetchone()
-        return _normalize_record(dict(by_Email)) if by_Email else None
+        return _normalize_record(dict(by_email)) if by_email else None
 
 
-def authenticate_user(identity: str, Password: str) -> tuple[dict[str, Any] | None, str]:
+def authenticate_user(identity: str, password: str) -> tuple[dict[str, Any] | None, str]:
     lookup = identity.strip().lower()
     if not lookup:
         return None, "Username or Email is required."
@@ -678,12 +422,12 @@ def authenticate_user(identity: str, Password: str) -> tuple[dict[str, Any] | No
         if not user_row:
             return None, "Account not found."
 
-        LockedUntil = _parse_datetime(user_row["LockedUntil"])
+        locked_until = _parse_datetime(user_row["LockedUntil"])
         now = _now()
-        if LockedUntil and now < LockedUntil:
-            return None, f"Account locked until {LockedUntil.strftime(DATETIME_FORMAT)}."
+        if locked_until and now < locked_until:
+            return None, f"Account locked until {locked_until.strftime(DATETIME_FORMAT)}."
 
-        if check_password_hash(user_row["password_hash"], Password):
+        if check_password_hash(user_row["PasswordHash"], password):
             conn.execute(
                 "UPDATE USER SET FailedLoginAttempts = 0, LockedUntil = NULL WHERE Username = ?",
                 (user_row["Username"],),
@@ -707,18 +451,18 @@ def authenticate_user(identity: str, Password: str) -> tuple[dict[str, Any] | No
         return None, f"Invalid credentials. {remaining} attempt(s) remaining before lockout."
 
 
-def get_user(Username: str) -> dict[str, Any] | None:
+def get_user(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
-        row = conn.execute("SELECT * FROM USER WHERE Username = ?", (Username,)).fetchone()
+        row = conn.execute("SELECT * FROM USER WHERE Username = ?", (username,)).fetchone()
         return _normalize_record(dict(row)) if row else None
 
 
 def update_personal_info(
-    Username: str,
-    Email: str,
-    FirstName: str | None,
-    LastName: str | None,
-    PhoneNum: str | None,
+    username: str,
+    email: str,
+    first_name: str | None,
+    last_name: str | None,
+    phone_num: str | None,
 ) -> None:
     with db_session() as conn:
         conn.execute(
@@ -727,7 +471,7 @@ def update_personal_info(
             SET Email = ?, FirstName = ?, LastName = ?, PhoneNum = ?
             WHERE Username = ?
             """,
-            (Email, FirstName, LastName, PhoneNum, Username),
+            (email, first_name, last_name, phone_num, username),
         )
 
 
@@ -735,7 +479,7 @@ def create_sso_token(identity: str, ttl_minutes: int = 10) -> tuple[bool, str, s
     user = get_user_by_identity(identity)
     if not user:
         return False, "Account not found.", None
-    username = str(user.get("Username") or user.get("username") or "").strip()
+    username = str(user.get("Username") or "").strip()
     if not username:
         return False, "Account not found.", None
 
@@ -745,6 +489,7 @@ def create_sso_token(identity: str, ttl_minutes: int = 10) -> tuple[bool, str, s
     expires_at = (now + timedelta(minutes=max(1, ttl_minutes))).strftime(DATETIME_FORMAT)
 
     with db_session() as conn:
+        # Remove stale and previously-used tokens before issuing a new one.
         conn.execute(
             "DELETE FROM SSO_TOKENS WHERE SsoExpiresAt < ? OR SsoUsedAt IS NOT NULL",
             (now.strftime(DATETIME_FORMAT),),
@@ -770,7 +515,7 @@ def consume_sso_token(raw_token: str) -> tuple[dict[str, Any] | None, str]:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT SsoTokenKey, Username, SsoExpiresAt AS expires_at, SsoUsedAt AS used_at
+            SELECT SsoTokenKey, Username, SsoExpiresAt AS ExpiresAt, SsoUsedAt AS UsedAt
             FROM SSO_TOKENS
             WHERE SsoTokenKey = ?
             LIMIT 1
@@ -780,9 +525,9 @@ def consume_sso_token(raw_token: str) -> tuple[dict[str, Any] | None, str]:
 
         if not row:
             return None, "SSO token is invalid."
-        if row["used_at"]:
+        if row["UsedAt"]:
             return None, "SSO token has already been used."
-        if str(row["expires_at"]) < now:
+        if str(row["ExpiresAt"]) < now:
             return None, "SSO token has expired."
 
         conn.execute(
@@ -802,12 +547,9 @@ def consume_sso_token(raw_token: str) -> tuple[dict[str, Any] | None, str]:
         )
         return _normalize_record(dict(user_row)), ""
 
-
-# -------------------------
 # Profile, XP, avatars
-# -------------------------
 
-def get_profile(Username: str) -> dict[str, Any] | None:
+def get_profile(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
         row = conn.execute(
             """
@@ -828,41 +570,36 @@ def get_profile(Username: str) -> dict[str, Any] | None:
             LEFT JOIN AVATAR a ON a.AvatarID = p.AvatarID
             WHERE p.Username = ?
             """,
-            (Username,),
+            (username,),
         ).fetchone()
         return _normalize_record(dict(row)) if row else None
 
 
-def award_XP(Username: str, XP_delta: int) -> dict[str, Any]:
+def award_xp(username: str, xp_delta: int) -> dict[str, Any]:
     with db_session() as conn:
         row = conn.execute(
             "SELECT XP, Level FROM PROFILE WHERE Username = ?",
-            (Username,),
+            (username,),
         ).fetchone()
         if not row:
             return _normalize_record({"XP": 0, "Level": 1, "LeveledUp": False})
 
-        previous_Level = int(row["Level"])
-        new_XP = int(row["XP"]) + max(0, int(XP_delta))
-        new_Level = max(1, (new_XP // 100) + 1)
+        previous_level = int(row["Level"])
+        new_xp = int(row["XP"]) + max(0, int(xp_delta))
+        new_level = max(1, (new_xp // 100) + 1)
 
         conn.execute(
             "UPDATE PROFILE SET XP = ?, Level = ? WHERE Username = ?",
-            (new_XP, new_Level, Username),
+            (new_xp, new_level, username),
         )
 
         return _normalize_record(
             {
-                "XP": new_XP,
-                "Level": new_Level,
-                "LeveledUp": new_Level > previous_Level,
+                "XP": new_xp,
+                "Level": new_level,
+                "LeveledUp": new_level > previous_level,
             }
         )
-
-
-def award_xp(username: str, xp_delta: int) -> dict[str, Any]:
-    return _normalize_record(award_XP(username, xp_delta))
-
 
 def list_avatars() -> list[dict[str, Any]]:
     with db_session() as conn:
@@ -871,19 +608,18 @@ def list_avatars() -> list[dict[str, Any]]:
         ).fetchall()
         return _rows_to_dicts(rows)
 
-
-def set_avatar(Username: str, AvatarID: int) -> tuple[bool, str]:
+def set_avatar(username: str, avatar_id: int) -> tuple[bool, str]:
     with db_session() as conn:
         avatar = conn.execute(
             "SELECT AvatarName, UnlockLevel FROM AVATAR WHERE AvatarID = ?",
-            (AvatarID,),
+            (avatar_id,),
         ).fetchone()
         if not avatar:
             return False, "Avatar not found."
 
         profile = conn.execute(
             "SELECT Level FROM PROFILE WHERE Username = ?",
-            (Username,),
+            (username,),
         ).fetchone()
         if not profile:
             return False, "Profile not found."
@@ -893,25 +629,16 @@ def set_avatar(Username: str, AvatarID: int) -> tuple[bool, str]:
 
         conn.execute(
             "UPDATE PROFILE SET AvatarID = ? WHERE Username = ?",
-            (AvatarID, Username),
+            (avatar_id, username),
         )
         return True, f"Avatar changed to {avatar['AvatarName']}."
 
-
-# -------------------------
 # Goals and activities
-# -------------------------
-
-def list_goal_Types() -> list[dict[str, Any]]:
-    with db_session() as conn:
-        rows = conn.execute(
-            "SELECT * FROM GOAL_TYPE ORDER BY GoalTypeName"
-        ).fetchall()
-        return _rows_to_dicts(rows)
-
 
 def list_goal_types() -> list[dict[str, Any]]:
-    return list_goal_Types()
+    with db_session() as conn:
+        rows = conn.execute("SELECT * FROM GOAL_TYPE ORDER BY GoalTypeName").fetchall()
+        return _rows_to_dicts(rows)
 
 
 def add_goal(
@@ -933,7 +660,7 @@ def add_goal(
         )
 
 
-def list_goals(Username: str) -> list[dict[str, Any]]:
+def list_goals(username: str) -> list[dict[str, Any]]:
     with db_session() as conn:
         rows = conn.execute(
             """
@@ -944,7 +671,7 @@ def list_goals(Username: str) -> list[dict[str, Any]]:
                 g.TargetValue,
                 g.StartDate,
                 g.EndDate,
-                g.GoalStatus AS Status,
+                g.GoalStatus,
                 gt.GoalTypeName,
                 gt.Unit
             FROM GOALS g
@@ -952,21 +679,17 @@ def list_goals(Username: str) -> list[dict[str, Any]]:
             WHERE g.Username = ?
             ORDER BY g.GoalID DESC
             """,
-            (Username,),
+            (username,),
         ).fetchall()
         return _rows_to_dicts(rows)
 
 
-def update_goal_Status(Username: str, GoalID: int, Status: str) -> None:
+def update_goal_status(username: str, goal_id: int, status: str) -> None:
     with db_session() as conn:
         conn.execute(
             "UPDATE GOALS SET GoalStatus = ? WHERE GoalID = ? AND Username = ?",
-            (Status, GoalID, Username),
+            (status, goal_id, username),
         )
-
-
-def update_goal_status(username: str, goal_id: int, status: str) -> None:
-    update_goal_Status(username, goal_id, status)
 
 
 def add_activity(
@@ -979,23 +702,33 @@ def add_activity(
     source: str,
     difficulty: str | None = None,
 ) -> None:
-    stamp = activity_date or _now_str()
+    logged_at = activity_date or _now_str()
     difficulty_value = str(difficulty or "Standard").strip().title()
     if difficulty_value not in WORKOUT_DIFFICULTIES:
         difficulty_value = "Standard"
+
     with db_session() as conn:
         conn.execute(
             """
             INSERT INTO ACTIVITIES (
-                Username, Type, DurationMinutes, CaloriesBurnt, DistanceKm, ActivityDate, Source, difficulty
+                Username, Type, DurationMinutes, CaloriesBurnt, DistanceKm, ActivityDate, Source, Difficulty
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (username, activity_type, duration_minutes, calories, distance_km, stamp, source, difficulty_value),
+            (
+                username,
+                activity_type,
+                duration_minutes,
+                calories_burnt,
+                distance_km,
+                logged_at,
+                source,
+                difficulty_value,
+            ),
         )
 
 
-def list_activities(Username: str, limit: int = 100) -> list[dict[str, Any]]:
+def list_activities(username: str, limit: int = 100) -> list[dict[str, Any]]:
     with db_session() as conn:
         rows = conn.execute(
             """
@@ -1005,71 +738,61 @@ def list_activities(Username: str, limit: int = 100) -> list[dict[str, Any]]:
             ORDER BY ActivityDate DESC, ActivityID DESC
             LIMIT ?
             """,
-            (Username, limit),
+            (username, limit),
         ).fetchall()
         return _rows_to_dicts(rows)
 
 
-def workout_XP_value(DurationMinutes: int, difficulty: str) -> int:
-    duration = max(1, int(DurationMinutes))
+def workout_xp_value(duration_minutes: int, difficulty: str) -> int:
+    duration = max(1, int(duration_minutes))
     difficulty_value = str(difficulty or "Standard").strip().title()
     multiplier = {"Easy": 0.9, "Standard": 1.0, "Hard": 1.2}.get(difficulty_value, 1.0)
     return max(10, int(round(duration * multiplier)))
 
-
-def workout_xp_value(duration_minutes: int, difficulty: str) -> int:
-    return workout_XP_value(duration_minutes, difficulty)
-
-
-# -------------------------
 # Calories and hydration
-# -------------------------
 
-def add_calorie_log(Username: str, CalorieIntake: int, LogDate: str | None) -> None:
-    EntryDate = LogDate or _today_str()
+def add_calorie_log(username: str, calorie_intake: int, log_date: str | None) -> None:
+    entry_date = log_date or _today_str()
     with db_session() as conn:
         conn.execute(
             "INSERT INTO CALORIES (Username, CalorieIntake, LogDate) VALUES (?, ?, ?)",
-            (Username, CalorieIntake, EntryDate),
+            (username, calorie_intake, entry_date),
         )
 
 
-def list_calorie_logs(Username: str, limit: int = 90) -> list[dict[str, Any]]:
+def list_calorie_logs(username: str, limit: int = 90) -> list[dict[str, Any]]:
     with db_session() as conn:
         rows = conn.execute(
             "SELECT * FROM CALORIES WHERE Username = ? ORDER BY LogDate DESC, LogID DESC LIMIT ?",
-            (Username, limit),
+            (username, limit),
         ).fetchall()
         return _rows_to_dicts(rows)
 
 
-def add_hydration_log(Username: str, HydrationIntake: float, EntryDate: str | None) -> None:
-    date_value = EntryDate or _today_str()
+def add_hydration_log(username: str, hydration_intake: float, entry_date: str | None) -> None:
+    date_value = entry_date or _today_str()
     with db_session() as conn:
         conn.execute(
             "INSERT INTO HYDRATION (Username, HydrationIntake, EntryDate) VALUES (?, ?, ?)",
-            (Username, HydrationIntake, date_value),
+            (username, hydration_intake, date_value),
         )
 
 
-def list_hydration_logs(Username: str, limit: int = 90) -> list[dict[str, Any]]:
+def list_hydration_logs(username: str, limit: int = 90) -> list[dict[str, Any]]:
     with db_session() as conn:
         rows = conn.execute(
             "SELECT * FROM HYDRATION WHERE Username = ? ORDER BY EntryDate DESC, EntryID DESC LIMIT ?",
-            (Username, limit),
+            (username, limit),
         ).fetchall()
         return _rows_to_dicts(rows)
 
-
-# -------------------------
 # Health and recommendations
-# -------------------------
 
-def get_health(Username: str) -> dict[str, Any] | None:
+def get_health(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
         row = conn.execute(
             "SELECT * FROM HEALTH WHERE Username = ?",
-            (Username,),
+            (username,),
         ).fetchone()
         return _normalize_record(dict(row)) if row else None
 
@@ -1098,9 +821,9 @@ def update_health(
                 HeightCm,
                 ActivityLevel,
                 OverallHealth,
-                health_conditions,
-                diet_profile,
-                climate,
+                HealthConditions,
+                DietProfile,
+                Climate,
                 Mood
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1112,9 +835,9 @@ def update_health(
                 HeightCm = excluded.HeightCm,
                 ActivityLevel = excluded.ActivityLevel,
                 OverallHealth = excluded.OverallHealth,
-                health_conditions = excluded.health_conditions,
-                diet_profile = excluded.diet_profile,
-                climate = excluded.climate,
+                HealthConditions = excluded.HealthConditions,
+                DietProfile = excluded.DietProfile,
+                Climate = excluded.Climate,
                 Mood = excluded.Mood
             """,
             (
@@ -1133,37 +856,33 @@ def update_health(
         )
 
 
-def update_Mood(Username: str, Mood: str) -> None:
-    current = get_health(Username) or {}
+def update_mood(username: str, mood: str) -> None:
+    current = get_health(username) or {}
     update_health(
-        username=Username,
+        username=username,
         age=current.get("Age"),
         sex=current.get("Sex"),
         weight_kg=current.get("WeightKg"),
         height_cm=current.get("HeightCm"),
         activity_level=current.get("ActivityLevel"),
         overall_health=current.get("OverallHealth"),
-        health_conditions=current.get("health_conditions"),
-        diet_profile=current.get("diet_profile"),
-        climate=current.get("climate"),
-        mood=Mood,
+        health_conditions=current.get("HealthConditions"),
+        diet_profile=current.get("DietProfile"),
+        climate=current.get("Climate"),
+        mood=mood,
     )
 
 
-def update_mood(username: str, mood: str) -> None:
-    update_Mood(username, mood)
-
-
-def calorie_recommendation(Username: str) -> dict[str, Any]:
-    health = get_health(Username) or {}
-    Age = health.get("Age")
-    Sex = (health.get("Sex") or "").strip().lower()
+def calorie_recommendation(username: str) -> dict[str, Any]:
+    health = get_health(username) or {}
+    age = health.get("Age")
+    sex = (health.get("Sex") or "").strip().lower()
     weight = health.get("WeightKg")
     height = health.get("HeightCm")
-    ActivityLevel = (health.get("ActivityLevel") or "moderate").strip().lower()
-    OverallHealth = (health.get("OverallHealth") or "").strip().lower()
+    activity_level = (health.get("ActivityLevel") or "moderate").strip().lower()
+    overall_health = (health.get("OverallHealth") or "").strip().lower()
 
-    if not all([Age, weight, height]):
+    if not all([age, weight, height]):
         return _normalize_record(
             {
                 "Recommended": 2000,
@@ -1174,12 +893,12 @@ def calorie_recommendation(Username: str) -> dict[str, Any]:
             }
         )
 
-    if Sex.startswith("m"):
-        bmr = (10 * weight) + (6.25 * height) - (5 * Age) + 5
-    elif Sex.startswith("f"):
-        bmr = (10 * weight) + (6.25 * height) - (5 * Age) - 161
+    if sex.startswith("m"):
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
+    elif sex.startswith("f"):
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161
     else:
-        bmr = (10 * weight) + (6.25 * height) - (5 * Age) - 78
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 78
 
     multipliers = {
         "sedentary": 1.2,
@@ -1189,15 +908,15 @@ def calorie_recommendation(Username: str) -> dict[str, Any]:
         "very active": 1.9,
     }
 
-    multiplier = multipliers.get(ActivityLevel, 1.55)
+    multiplier = multipliers.get(activity_level, 1.55)
     recommended = int(round(bmr * multiplier))
 
     health_adjustment = 0
     adjustment_note = "No additional health-based adjustment applied."
-    if any(term in OverallHealth for term in ("weight loss", "lose weight", "fat loss", "obesity")):
+    if any(term in overall_health for term in ("weight loss", "lose weight", "fat loss", "obesity")):
         health_adjustment = -250
         adjustment_note = "Adjusted for a possible weight-loss focus in health notes."
-    elif any(term in OverallHealth for term in ("muscle gain", "underweight", "bulking", "gain weight")):
+    elif any(term in overall_health for term in ("muscle gain", "underweight", "bulking", "gain weight")):
         health_adjustment = 200
         adjustment_note = "Adjusted for a possible muscle-gain/weight-gain focus in health notes."
 
@@ -1213,24 +932,24 @@ def calorie_recommendation(Username: str) -> dict[str, Any]:
     )
 
 
-def hydration_recommendation(Username: str) -> dict[str, Any]:
-    health = get_health(Username) or {}
-    Age = health.get("Age")
-    Sex = (health.get("Sex") or "").strip().lower()
+def hydration_recommendation(username: str) -> dict[str, Any]:
+    health = get_health(username) or {}
+    age = health.get("Age")
+    sex = (health.get("Sex") or "").strip().lower()
     weight = health.get("WeightKg")
-    ActivityLevel = (health.get("ActivityLevel") or "moderate").strip().lower()
-    climate = (health.get("climate") or "temperate").strip().lower()
+    activity_level = (health.get("ActivityLevel") or "moderate").strip().lower()
+    climate = (health.get("Climate") or "temperate").strip().lower()
 
     if weight:
         baseline = weight * 0.033
     else:
         baseline = 2.6
-        if Sex.startswith("f"):
+        if sex.startswith("f"):
             baseline = 2.2
-        elif Sex.startswith("m"):
+        elif sex.startswith("m"):
             baseline = 3.0
 
-    if Age and int(Age) >= 55:
+    if age and int(age) >= 55:
         baseline -= 0.15
 
     activity_extras = {
@@ -1251,7 +970,7 @@ def hydration_recommendation(Username: str) -> dict[str, Any]:
     recommended = round(
         max(
             1.5,
-            baseline + activity_extras.get(ActivityLevel, 0.5) + climate_extras.get(climate, 0.3),
+            baseline + activity_extras.get(activity_level, 0.5) + climate_extras.get(climate, 0.3),
         ),
         2,
     )
@@ -1263,38 +982,42 @@ def hydration_recommendation(Username: str) -> dict[str, Any]:
     )
 
 
-def personalized_health_tips(Username: str) -> list[str]:
-    health = get_health(Username) or {}
-    goals = list_goals(Username)
-    activities = list_activities(Username, limit=14)
+def personalized_health_tips(username: str) -> list[str]:
+    health = get_health(username) or {}
+    goals = list_goals(username)
+    activities = list_activities(username, limit=14)
     tips: list[str] = []
 
-    ActivityLevel = str(health.get("ActivityLevel") or "").strip().lower()
-    if ActivityLevel in {"", "sedentary"}:
+    activity_level = str(health.get("ActivityLevel") or "").strip().lower()
+    if activity_level in {"", "sedentary"}:
         tips.append("Start with short daily movement blocks (10-15 min) and increase gradually.")
-    elif ActivityLevel in {"active", "very active"}:
+    elif activity_level in {"active", "very active"}:
         tips.append("Schedule at least one recovery-focused session each week to support consistency.")
 
-    climate = str(health.get("climate") or "").strip().lower()
+    climate = str(health.get("Climate") or "").strip().lower()
     if climate in {"hot", "humid", "dry"}:
         tips.append("Hydrate before and after sessions; hotter or drier climates usually require extra fluid.")
 
-    conditions = str(health.get("health_conditions") or "").strip()
+    conditions = str(health.get("HealthConditions") or "").strip()
     if conditions:
         tips.append("Use low-impact alternatives when needed and pace intensity around your listed conditions.")
 
-    diet_profile = str(health.get("diet_profile") or "").strip().lower()
+    diet_profile = str(health.get("DietProfile") or "").strip().lower()
     if "high protein" in diet_profile:
         tips.append("Spread protein intake across meals to support muscular recovery.")
     elif diet_profile:
         tips.append("Keep meals consistent with your diet preferences and prioritize minimally processed foods.")
 
-    goal_Types = {str(goal.get("GoalTypeName") or "").lower() for goal in goals if goal.get("Status") != "Cancelled"}
-    if "hydration" in goal_Types:
+    active_goal_types = {
+        str(goal.get("GoalTypeName") or "").lower()
+        for goal in goals
+        if goal.get("GoalStatus") != "Cancelled"
+    }
+    if "hydration" in active_goal_types:
         tips.append("Pair each meal with water to make hydration goals easier to sustain.")
-    if "exercise" in goal_Types:
+    if "exercise" in active_goal_types:
         tips.append("Use progressive overload: small weekly increases in duration or intensity are more sustainable.")
-    if "Calories" in goal_Types:
+    if "calories" in active_goal_types:
         tips.append("Track calorie patterns over a full week rather than single-day fluctuations.")
 
     recent_minutes = sum(int(item.get("DurationMinutes") or 0) for item in activities[:7])
@@ -1367,12 +1090,9 @@ def search_health_topics(query: str) -> dict[str, Any]:
         }
     )
 
-
-# -------------------------
 # Friends
-# -------------------------
 
-def search_users(search_term: str, current_Username: str) -> list[dict[str, Any]]:
+def search_users(search_term: str, current_username: str) -> list[dict[str, Any]]:
     query = f"%{search_term.strip()}%"
     with db_session() as conn:
         rows = conn.execute(
@@ -1383,19 +1103,19 @@ def search_users(search_term: str, current_Username: str) -> list[dict[str, Any]
             ORDER BY Username
             LIMIT 20
             """,
-            (current_Username, query),
+            (current_username, query),
         ).fetchall()
         return _rows_to_dicts(rows)
 
 
-def send_friend_request(RequesterUsername: str, TargetUsername: str) -> tuple[bool, str]:
-    if RequesterUsername == TargetUsername:
+def send_friend_request(requester_username: str, target_username: str) -> tuple[bool, str]:
+    if requester_username == target_username:
         return False, "You cannot add yourself."
 
     with db_session() as conn:
         target = conn.execute(
             "SELECT Username FROM USER WHERE Username = ?",
-            (TargetUsername,),
+            (target_username,),
         ).fetchone()
         if not target:
             return False, "User not found."
@@ -1407,14 +1127,14 @@ def send_friend_request(RequesterUsername: str, TargetUsername: str) -> tuple[bo
             WHERE (RequesterUsername = ? AND TargetUsername = ?)
                OR (RequesterUsername = ? AND TargetUsername = ?)
             """,
-            (RequesterUsername, TargetUsername, TargetUsername, RequesterUsername),
+            (requester_username, target_username, target_username, requester_username),
         ).fetchone()
 
         if existing:
-            Status = existing["RequestStatus"]
-            if Status == "Accepted":
+            request_status = existing["RequestStatus"]
+            if request_status == "Accepted":
                 return False, "You are already friends."
-            if Status == "Pending":
+            if request_status == "Pending":
                 return False, "Friend request already pending."
 
         conn.execute(
@@ -1426,8 +1146,8 @@ def send_friend_request(RequesterUsername: str, TargetUsername: str) -> tuple[bo
             """,
             (
                 existing["FriendshipID"] if existing else None,
-                RequesterUsername,
-                TargetUsername,
+                requester_username,
+                target_username,
                 _now_str(),
             ),
         )
@@ -1435,8 +1155,8 @@ def send_friend_request(RequesterUsername: str, TargetUsername: str) -> tuple[bo
     return True, "Friend request sent."
 
 
-def respond_friend_request(Username: str, FriendshipID: int, decision: str) -> tuple[bool, str]:
-    Status = "Accepted" if decision == "accept" else "Rejected"
+def respond_friend_request(username: str, friendship_id: int, decision: str) -> tuple[bool, str]:
+    status = "Accepted" if decision == "accept" else "Rejected"
 
     with db_session() as conn:
         row = conn.execute(
@@ -1445,20 +1165,20 @@ def respond_friend_request(Username: str, FriendshipID: int, decision: str) -> t
             FROM FRIENDS
             WHERE FriendshipID = ? AND TargetUsername = ? AND RequestStatus = 'Pending'
             """,
-            (FriendshipID, Username),
+            (friendship_id, username),
         ).fetchone()
         if not row:
             return False, "Request not found or already handled."
 
         conn.execute(
             "UPDATE FRIENDS SET RequestStatus = ? WHERE FriendshipID = ?",
-            (Status, FriendshipID),
+            (status, friendship_id),
         )
 
-    return True, f"Friend request {Status.lower()}."
+    return True, f"Friend request {status.lower()}."
 
 
-def get_friend_data(Username: str) -> dict[str, list[dict[str, Any]]]:
+def get_friend_data(username: str) -> dict[str, list[dict[str, Any]]]:
     with db_session() as conn:
         accepted_rows = conn.execute(
             """
@@ -1473,27 +1193,27 @@ def get_friend_data(Username: str) -> dict[str, list[dict[str, Any]]]:
               AND RequestStatus = 'Accepted'
             ORDER BY FriendUsername
             """,
-            (Username, Username, Username),
+            (username, username, username),
         ).fetchall()
 
         incoming_rows = conn.execute(
             """
-            SELECT FriendshipID, RequesterUsername, FriendshipCreatedAt AS created_at
+            SELECT FriendshipID, RequesterUsername, FriendshipCreatedAt
             FROM FRIENDS
             WHERE TargetUsername = ? AND RequestStatus = 'Pending'
             ORDER BY FriendshipCreatedAt DESC
             """,
-            (Username,),
+            (username,),
         ).fetchall()
 
         outgoing_rows = conn.execute(
             """
-            SELECT FriendshipID, TargetUsername, FriendshipCreatedAt AS created_at
+            SELECT FriendshipID, TargetUsername, FriendshipCreatedAt
             FROM FRIENDS
             WHERE RequesterUsername = ? AND RequestStatus = 'Pending'
             ORDER BY FriendshipCreatedAt DESC
             """,
-            (Username,),
+            (username,),
         ).fetchall()
 
     return _normalize_record(
@@ -1513,13 +1233,13 @@ def create_friend_invite_link(username: str, ttl_days: int = 7, max_uses: int = 
 
     with db_session() as conn:
         conn.execute(
-            "DELETE FROM FRIEND_INVITE_LINKS WHERE is_active = 0 OR LinkExpiresAt < ?",
+            "DELETE FROM FRIEND_INVITE_LINKS WHERE IsActive = 0 OR LinkExpiresAt < ?",
             (now.strftime(DATETIME_FORMAT),),
         )
         conn.execute(
             """
             INSERT INTO FRIEND_INVITE_LINKS (
-                FriendInviteLinkKey, public_token, inviter_username, LinkCreatedAt, LinkExpiresAt, use_count, max_uses, is_active
+                FriendInviteLinkKey, PublicToken, InviterUsername, LinkCreatedAt, LinkExpiresAt, UseCount, MaxUses, IsActive
             )
             VALUES (?, ?, ?, ?, ?, 0, ?, 1)
             """,
@@ -1542,48 +1262,47 @@ def create_friend_invite_link(username: str, ttl_days: int = 7, max_uses: int = 
     )
 
 
-def list_friend_invite_links(Username: str, limit: int = 8) -> list[dict[str, Any]]:
+def list_friend_invite_links(username: str, limit: int = 8) -> list[dict[str, Any]]:
     now = _now().strftime(DATETIME_FORMAT)
     with db_session() as conn:
         rows = conn.execute(
             """
-            SELECT FriendInviteLinkKey AS token_hash, LinkCreatedAt AS created_at, LinkExpiresAt AS expires_at, use_count, max_uses, is_active
-                 , public_token
+            SELECT FriendInviteLinkKey, LinkCreatedAt, LinkExpiresAt, UseCount, MaxUses, IsActive, PublicToken
             FROM FRIEND_INVITE_LINKS
-            WHERE inviter_username = ?
-              AND is_active = 1
+            WHERE InviterUsername = ?
+              AND IsActive = 1
               AND LinkExpiresAt >= ?
             ORDER BY LinkCreatedAt DESC
             LIMIT ?
             """,
-            (Username, now, limit),
+            (username, now, limit),
         ).fetchall()
         return _rows_to_dicts(rows)
 
 
-def disable_friend_invite_link(Username: str, token_hash: str) -> tuple[bool, str]:
+def disable_friend_invite_link(username: str, token_hash: str) -> tuple[bool, str]:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT FriendInviteLinkKey AS token_hash
+            SELECT FriendInviteLinkKey
             FROM FRIEND_INVITE_LINKS
             WHERE FriendInviteLinkKey = ?
-              AND inviter_username = ?
+              AND InviterUsername = ?
             LIMIT 1
             """,
-            (token_hash, Username),
+            (token_hash, username),
         ).fetchone()
         if not row:
             return False, "Invite link not found."
 
         conn.execute(
-            "UPDATE FRIEND_INVITE_LINKS SET is_active = 0 WHERE FriendInviteLinkKey = ?",
+            "UPDATE FRIEND_INVITE_LINKS SET IsActive = 0 WHERE FriendInviteLinkKey = ?",
             (token_hash,),
         )
     return True, "Invite link disabled."
 
 
-def accept_friend_invite_link(raw_token: str, Username: str) -> tuple[bool, str]:
+def accept_friend_invite_link(raw_token: str, username: str) -> tuple[bool, str]:
     if not raw_token:
         return False, "Invite link token is missing."
 
@@ -1593,7 +1312,7 @@ def accept_friend_invite_link(raw_token: str, Username: str) -> tuple[bool, str]
     with db_session() as conn:
         link = conn.execute(
             """
-            SELECT FriendInviteLinkKey AS token_hash, inviter_username, LinkExpiresAt AS expires_at, use_count, max_uses, is_active
+            SELECT FriendInviteLinkKey, InviterUsername, LinkExpiresAt, UseCount, MaxUses, IsActive
             FROM FRIEND_INVITE_LINKS
             WHERE FriendInviteLinkKey = ?
             LIMIT 1
@@ -1602,18 +1321,18 @@ def accept_friend_invite_link(raw_token: str, Username: str) -> tuple[bool, str]
         ).fetchone()
         if not link:
             return False, "Invite link is invalid."
-        if int(link["is_active"]) != 1:
+        if int(link["IsActive"]) != 1:
             return False, "Invite link is inactive."
-        if str(link["expires_at"]) < now:
+        if str(link["LinkExpiresAt"]) < now:
             return False, "Invite link has expired."
-        if int(link["use_count"]) >= int(link["max_uses"]):
+        if int(link["UseCount"]) >= int(link["MaxUses"]):
             return False, "Invite link usage limit reached."
 
-        inviter = str(link["inviter_username"])
-        if inviter == Username:
+        inviter = str(link["InviterUsername"])
+        if inviter == username:
             return False, "You cannot use your own invite link."
 
-    ok, message = send_friend_request(Username, inviter)
+    ok, message = send_friend_request(username, inviter)
     if not ok:
         return False, message
 
@@ -1621,8 +1340,8 @@ def accept_friend_invite_link(raw_token: str, Username: str) -> tuple[bool, str]
         conn.execute(
             """
             UPDATE FRIEND_INVITE_LINKS
-            SET use_count = use_count + 1,
-                is_active = CASE WHEN use_count + 1 >= max_uses THEN 0 ELSE is_active END
+            SET UseCount = UseCount + 1,
+                IsActive = CASE WHEN UseCount + 1 >= MaxUses THEN 0 ELSE IsActive END
             WHERE FriendInviteLinkKey = ?
             """,
             (token_hash,),
@@ -1658,8 +1377,8 @@ def _has_active_coop_match(conn: sqlite3.Connection, user_a: str, user_b: str) -
         FROM COOP_MATCHES
         WHERE MatchStatus = 'Active'
           AND (
-                (player_one = ? AND player_two = ?)
-             OR (player_one = ? AND player_two = ?)
+                (PlayerOne = ? AND PlayerTwo = ?)
+             OR (PlayerOne = ? AND PlayerTwo = ?)
           )
         LIMIT 1
         """,
@@ -1668,7 +1387,7 @@ def _has_active_coop_match(conn: sqlite3.Connection, user_a: str, user_b: str) -
     return bool(row)
 
 
-def list_coop_friends(Username: str) -> list[dict[str, Any]]:
+def list_coop_friends(username: str) -> list[dict[str, Any]]:
     with db_session() as conn:
         rows = conn.execute(
             """
@@ -1682,7 +1401,7 @@ def list_coop_friends(Username: str) -> list[dict[str, Any]]:
               AND (RequesterUsername = ? OR TargetUsername = ?)
             ORDER BY FriendUsername
             """,
-            (Username, Username, Username),
+            (username, username, username),
         ).fetchall()
         return _rows_to_dicts(rows)
 
@@ -1707,12 +1426,12 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
 
         existing_pending = conn.execute(
             """
-            SELECT invite_id
+            SELECT InviteID
             FROM COOP_INVITES
             WHERE InviteStatus = 'Pending'
               AND (
-                    (from_username = ? AND to_username = ?)
-                 OR (from_username = ? AND to_username = ?)
+                    (FromUsername = ? AND ToUsername = ?)
+                 OR (FromUsername = ? AND ToUsername = ?)
               )
             LIMIT 1
             """,
@@ -1723,7 +1442,7 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
 
         conn.execute(
             """
-            INSERT INTO COOP_INVITES (from_username, to_username, InviteStatus, InviteCreatedAt)
+            INSERT INTO COOP_INVITES (FromUsername, ToUsername, InviteStatus, InviteCreatedAt)
             VALUES (?, ?, 'Pending', ?)
             """,
             (from_username, to_username, _now_str()),
@@ -1732,17 +1451,17 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
     return True, "Co-op invite sent."
 
 
-def cancel_coop_invite(Username: str, invite_id: int) -> tuple[bool, str]:
+def cancel_coop_invite(username: str, invite_id: int) -> tuple[bool, str]:
     with db_session() as conn:
         invite = conn.execute(
             """
-            SELECT invite_id
+            SELECT InviteID
             FROM COOP_INVITES
-            WHERE invite_id = ?
-              AND from_username = ?
+            WHERE InviteID = ?
+              AND FromUsername = ?
               AND InviteStatus = 'Pending'
             """,
-            (invite_id, Username),
+            (invite_id, username),
         ).fetchone()
         if not invite:
             return False, "Invite not found."
@@ -1751,35 +1470,35 @@ def cancel_coop_invite(Username: str, invite_id: int) -> tuple[bool, str]:
             """
             UPDATE COOP_INVITES
             SET InviteStatus = 'Cancelled', InviteRespondedAt = ?
-            WHERE invite_id = ?
+            WHERE InviteID = ?
             """,
             (_now_str(), invite_id),
         )
     return True, "Invite cancelled."
 
 
-def list_coop_invites(Username: str) -> dict[str, list[dict[str, Any]]]:
+def list_coop_invites(username: str) -> dict[str, list[dict[str, Any]]]:
     with db_session() as conn:
         incoming_rows = conn.execute(
             """
-            SELECT invite_id, from_username, InviteCreatedAt AS created_at
+            SELECT InviteID, FromUsername, InviteCreatedAt
             FROM COOP_INVITES
-            WHERE to_username = ?
+            WHERE ToUsername = ?
               AND InviteStatus = 'Pending'
             ORDER BY InviteCreatedAt DESC
             """,
-            (Username,),
+            (username,),
         ).fetchall()
 
         outgoing_rows = conn.execute(
             """
-            SELECT invite_id, to_username, InviteCreatedAt AS created_at
+            SELECT InviteID, ToUsername, InviteCreatedAt
             FROM COOP_INVITES
-            WHERE from_username = ?
+            WHERE FromUsername = ?
               AND InviteStatus = 'Pending'
             ORDER BY InviteCreatedAt DESC
             """,
-            (Username,),
+            (username,),
         ).fetchall()
 
     return _normalize_record(
@@ -1790,18 +1509,18 @@ def list_coop_invites(Username: str) -> dict[str, list[dict[str, Any]]]:
     )
 
 
-def get_pending_coop_invite_for_user(Username: str, invite_id: int) -> dict[str, Any] | None:
+def get_pending_coop_invite_for_user(username: str, invite_id: int) -> dict[str, Any] | None:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT invite_id, from_username, to_username, InviteStatus AS Status, InviteCreatedAt AS created_at
+            SELECT InviteID, FromUsername, ToUsername, InviteStatus, InviteCreatedAt
             FROM COOP_INVITES
-            WHERE invite_id = ?
-              AND to_username = ?
+            WHERE InviteID = ?
+              AND ToUsername = ?
               AND InviteStatus = 'Pending'
             LIMIT 1
             """,
-            (invite_id, Username),
+            (invite_id, username),
         ).fetchone()
         return _normalize_record(dict(row)) if row else None
 
@@ -1816,10 +1535,10 @@ def respond_coop_invite(
     with db_session() as conn:
         invite = conn.execute(
             """
-            SELECT invite_id, from_username, to_username, InviteStatus AS Status
+            SELECT InviteID, FromUsername, ToUsername, InviteStatus
             FROM COOP_INVITES
-            WHERE invite_id = ?
-              AND to_username = ?
+            WHERE InviteID = ?
+              AND ToUsername = ?
               AND InviteStatus = 'Pending'
             """,
             (invite_id, username),
@@ -1832,14 +1551,14 @@ def respond_coop_invite(
                 """
                 UPDATE COOP_INVITES
                 SET InviteStatus = 'Declined', InviteRespondedAt = ?
-                WHERE invite_id = ?
+                WHERE InviteID = ?
                 """,
                 (_now_str(), invite_id),
             )
             return True, "Invite declined.", None
 
-        from_username = str(invite["from_username"])
-        to_username = str(invite["to_username"])
+        from_username = str(invite["FromUsername"])
+        to_username = str(invite["ToUsername"])
 
         if not _are_friends(conn, from_username, to_username):
             return False, "You are no longer accepted friends.", None
@@ -1857,10 +1576,10 @@ def respond_coop_invite(
         conn.execute(
             """
             INSERT INTO COOP_MATCHES (
-                player_one,
-                player_two,
-                turn_username,
-                state_json,
+                PlayerOne,
+                PlayerTwo,
+                TurnUsername,
+                StateJson,
                 MatchStatus,
                 MatchWinner,
                 MatchCreatedAt,
@@ -1883,19 +1602,20 @@ def respond_coop_invite(
             """
             UPDATE COOP_INVITES
             SET InviteStatus = 'Accepted', InviteRespondedAt = ?
-            WHERE invite_id = ?
+            WHERE InviteID = ?
             """,
             (current_time, invite_id),
         )
 
+        # Once a match starts, close any other pending invite between the same pair.
         conn.execute(
             """
             UPDATE COOP_INVITES
             SET InviteStatus = 'Cancelled', InviteRespondedAt = ?
             WHERE InviteStatus = 'Pending'
               AND (
-                    (from_username = ? AND to_username = ?)
-                 OR (from_username = ? AND to_username = ?)
+                    (FromUsername = ? AND ToUsername = ?)
+                 OR (FromUsername = ? AND ToUsername = ?)
               )
             """,
             (current_time, from_username, to_username, to_username, from_username),
@@ -1904,51 +1624,51 @@ def respond_coop_invite(
     return True, "Invite accepted.", match_id
 
 
-def get_active_coop_match_for_user(Username: str) -> dict[str, Any] | None:
+def get_active_coop_match_for_user(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
         row = conn.execute(
             """
             SELECT
-                match_id,
-                player_one,
-                player_two,
-                turn_username,
-                state_json,
-                MatchStatus AS Status,
-                MatchWinner AS Winner,
-                MatchCreatedAt AS created_at,
-                MatchUpdatedAt AS updated_at
+                MatchID,
+                PlayerOne,
+                PlayerTwo,
+                TurnUsername,
+                StateJson,
+                MatchStatus,
+                MatchWinner,
+                MatchCreatedAt,
+                MatchUpdatedAt
             FROM COOP_MATCHES
             WHERE MatchStatus = 'Active'
-              AND (player_one = ? OR player_two = ?)
-            ORDER BY MatchUpdatedAt DESC, match_id DESC
+              AND (PlayerOne = ? OR PlayerTwo = ?)
+            ORDER BY MatchUpdatedAt DESC, MatchID DESC
             LIMIT 1
             """,
-            (Username, Username),
+            (username, username),
         ).fetchone()
         return _normalize_record(dict(row)) if row else None
 
 
-def get_coop_match_for_user(Username: str, match_id: int) -> dict[str, Any] | None:
+def get_coop_match_for_user(username: str, match_id: int) -> dict[str, Any] | None:
     with db_session() as conn:
         row = conn.execute(
             """
             SELECT
-                match_id,
-                player_one,
-                player_two,
-                turn_username,
-                state_json,
-                MatchStatus AS Status,
-                MatchWinner AS Winner,
-                MatchCreatedAt AS created_at,
-                MatchUpdatedAt AS updated_at
+                MatchID,
+                PlayerOne,
+                PlayerTwo,
+                TurnUsername,
+                StateJson,
+                MatchStatus,
+                MatchWinner,
+                MatchCreatedAt,
+                MatchUpdatedAt
             FROM COOP_MATCHES
-            WHERE match_id = ?
-              AND (player_one = ? OR player_two = ?)
+            WHERE MatchID = ?
+              AND (PlayerOne = ? OR PlayerTwo = ?)
             LIMIT 1
             """,
-            (match_id, Username, Username),
+            (match_id, username, username),
         ).fetchone()
         return _normalize_record(dict(row)) if row else None
 
@@ -1965,37 +1685,37 @@ def update_coop_match_state(
         conn.execute(
             """
             UPDATE COOP_MATCHES
-            SET state_json = ?,
-                turn_username = ?,
+            SET StateJson = ?,
+                TurnUsername = ?,
                 MatchStatus = ?,
                 MatchWinner = ?,
                 MatchUpdatedAt = ?
-            WHERE match_id = ?
+            WHERE MatchID = ?
             """,
             (state_json, turn_value, status, winner, _now_str(), match_id),
         )
 
 
-def abandon_coop_match(Username: str, match_id: int) -> tuple[bool, str]:
+def abandon_coop_match(username: str, match_id: int) -> tuple[bool, str]:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT match_id, player_one, player_two, MatchStatus AS Status
+            SELECT MatchID, PlayerOne, PlayerTwo, MatchStatus
             FROM COOP_MATCHES
-            WHERE match_id = ?
-              AND (player_one = ? OR player_two = ?)
+            WHERE MatchID = ?
+              AND (PlayerOne = ? OR PlayerTwo = ?)
             LIMIT 1
             """,
-            (match_id, Username, Username),
+            (match_id, username, username),
         ).fetchone()
         if not row:
             return False, "Match not found."
-        if row["Status"] != "Active":
+        if row["MatchStatus"] != "Active":
             return False, "Match is not active."
 
-        player_one = str(row["player_one"])
-        player_two = str(row["player_two"])
-        Winner = player_two if Username == player_one else player_one
+        player_one = str(row["PlayerOne"])
+        player_two = str(row["PlayerTwo"])
+        winner = player_two if username == player_one else player_one
 
         conn.execute(
             """
@@ -2003,9 +1723,9 @@ def abandon_coop_match(Username: str, match_id: int) -> tuple[bool, str]:
             SET MatchStatus = 'Abandoned',
                 MatchWinner = ?,
                 MatchUpdatedAt = ?
-            WHERE match_id = ?
+            WHERE MatchID = ?
             """,
-            (Winner, _now_str(), match_id),
+            (winner, _now_str(), match_id),
         )
 
     return True, "Match abandoned."
@@ -2042,37 +1762,26 @@ def create_game_session(
             """,
             (mode["ModeID"], xp_earned, winner, start, _now_str()),
         )
-        SessionID = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
-
-        if _table_exists(conn, "game_sessions"):
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO game_sessions (
-                    session_id, mode_id, xp_earned, winner, start_time, end_time
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (SessionID, mode["ModeID"], xp_earned, winner, start, _now_str()),
-            )
+        session_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
         conn.execute(
             "INSERT INTO GAME_PLAYERS (SessionID, Username) VALUES (?, ?)",
-            (SessionID, username),
+            (session_id, username),
         )
 
-    XP_state = award_xp(username, xp_earned)
-    return _normalize_record({"SessionID": SessionID, **XP_state})
+    xp_state = award_xp(username, xp_earned)
+    return _normalize_record({"SessionID": session_id, **xp_state})
 
 
-def get_progress_dataset(Username: str, days: int) -> dict[str, Any]:
+def get_progress_dataset(username: str, days: int) -> dict[str, Any]:
     if days < 1:
         days = 1
 
-    EndDate = _now().date()
-    StartDate = EndDate - timedelta(days=days - 1)
+    end_date = _now().date()
+    start_date = end_date - timedelta(days=days - 1)
 
     labels = []
-    Calories_data = []
+    calories_data = []
     hydration_data = []
     exercise_data = []
 
@@ -2084,7 +1793,7 @@ def get_progress_dataset(Username: str, days: int) -> dict[str, Any]:
             WHERE Username = ? AND date(LogDate) BETWEEN date(?) AND date(?)
             GROUP BY LogDate
             """,
-            (Username, StartDate.isoformat(), EndDate.isoformat()),
+            (username, start_date.isoformat(), end_date.isoformat()),
         ).fetchall()
         hydration_rows = conn.execute(
             """
@@ -2093,7 +1802,7 @@ def get_progress_dataset(Username: str, days: int) -> dict[str, Any]:
             WHERE Username = ? AND date(EntryDate) BETWEEN date(?) AND date(?)
             GROUP BY EntryDate
             """,
-            (Username, StartDate.isoformat(), EndDate.isoformat()),
+            (username, start_date.isoformat(), end_date.isoformat()),
         ).fetchall()
         exercise_rows = conn.execute(
             """
@@ -2102,18 +1811,19 @@ def get_progress_dataset(Username: str, days: int) -> dict[str, Any]:
             WHERE Username = ? AND date(ActivityDate) BETWEEN date(?) AND date(?)
             GROUP BY date(ActivityDate)
             """,
-            (Username, StartDate.isoformat(), EndDate.isoformat()),
+            (username, start_date.isoformat(), end_date.isoformat()),
         ).fetchall()
 
     calorie_map = {row["day"]: row["total"] for row in calorie_rows}
     hydration_map = {row["day"]: row["total"] for row in hydration_rows}
     exercise_map = {row["day"]: row["total"] for row in exercise_rows}
 
-    current = StartDate
-    while current <= EndDate:
+    current = start_date
+    # Emit one row per day so charts stay stable even when no logs were entered.
+    while current <= end_date:
         key = current.isoformat()
         labels.append(key)
-        Calories_data.append(int(calorie_map.get(key, 0) or 0))
+        calories_data.append(int(calorie_map.get(key, 0) or 0))
         hydration_data.append(round(float(hydration_map.get(key, 0.0) or 0.0), 2))
         exercise_data.append(int(exercise_map.get(key, 0) or 0))
         current += timedelta(days=1)
@@ -2121,20 +1831,20 @@ def get_progress_dataset(Username: str, days: int) -> dict[str, Any]:
     return _normalize_record(
         {
             "Labels": labels,
-            "Calories": Calories_data,
+            "Calories": calories_data,
             "Hydration": hydration_data,
             "Exercise": exercise_data,
         }
     )
 
 
-def get_home_summary(Username: str) -> dict[str, Any]:
-    goals = list_goals(Username)
-    activities = list_activities(Username, limit=5)
-    profile = get_profile(Username) or {"XP": 0, "Level": 1, "AvatarName": "Starter Sprite"}
+def get_home_summary(username: str) -> dict[str, Any]:
+    goals = list_goals(username)
+    activities = list_activities(username, limit=5)
+    profile = get_profile(username) or {"XP": 0, "Level": 1, "AvatarName": "Starter Sprite"}
 
-    active_goals = [g for g in goals if (g.get("Status") or g.get("status")) in ("Active", "On Track")]
-    completed_goals = [g for g in goals if (g.get("Status") or g.get("status")) == "Completed"]
+    active_goals = [goal for goal in goals if goal.get("GoalStatus") in ("Active", "On Track")]
+    completed_goals = [goal for goal in goals if goal.get("GoalStatus") == "Completed"]
 
     today = _today_str()
     today_minutes = 0

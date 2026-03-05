@@ -57,7 +57,7 @@
     <div class="col-lg-3">
       <section class="mood-card">
         <h3 class="h6 mb-2">Mood Check-In</h3>
-        <div class="mood-line">Current mood: {{ health.mood if health and health.mood else 'Not set' }}</div>
+        <div class="mood-line">Current mood: {{ health.Mood if health and health.Mood else 'Not set' }}</div>
 
         <div class="d-grid gap-2 mt-2">
           {% for mood_option in ["Feeling good", "Feeling okay", "Feeling stressed"] %}

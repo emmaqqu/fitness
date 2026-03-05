@@ -27,15 +27,15 @@
     <div class="proto-list-card">
       {% if goal_preview %}
         {% for goal in goal_preview %}
-          {% if goal.status == 'Completed' %}
+          {% if goal.GoalStatus == 'Completed' %}
             {% set goal_pct = 100 %}
             {% set goal_tag = 'completed' %}
             {% set goal_label = 'Completed' %}
-          {% elif goal.status == 'On Track' %}
+          {% elif goal.GoalStatus == 'On Track' %}
             {% set goal_pct = 70 %}
             {% set goal_tag = 'on-track' %}
             {% set goal_label = 'On track' %}
-          {% elif goal.status == 'Cancelled' %}
+          {% elif goal.GoalStatus == 'Cancelled' %}
             {% set goal_pct = 20 %}
             {% set goal_tag = 'behind' %}
             {% set goal_label = 'Cancelled' %}
@@ -50,8 +50,8 @@
               <div class="goal-left">
                 <span class="row-dot goal {% if loop.index % 2 == 0 %}alt{% endif %}"></span>
                 <div>
-                  <div class="row-main">{{ goal.goal_type_name }} {{ goal.target_value|round(0) }} {{ goal.unit }}</div>
-                  <div class="row-sub">{{ goal.status }}</div>
+                  <div class="row-main">{{ goal.GoalTypeName }} {{ goal.TargetValue|round(0) }} {{ goal.Unit }}</div>
+                  <div class="row-sub">{{ goal.GoalStatus }}</div>
                 </div>
               </div>
               <span class="status-pill {{ goal_tag }}">{{ goal_label }}</span>
@@ -82,11 +82,11 @@
             <div class="activity-left">
               <span class="row-dot activity {% if loop.index % 2 == 0 %}alt{% endif %}"></span>
                 <div>
-                  <div class="row-main">{{ activity.type }}</div>
-                <div class="row-sub">{{ activity.duration_minutes }} min · {{ activity.calories or 0 }} cal · {{ activity.difficulty or 'Standard' }}</div>
+                  <div class="row-main">{{ activity.Type }}</div>
+                <div class="row-sub">{{ activity.DurationMinutes }} min · {{ activity.CaloriesBurnt or 0 }} cal · {{ activity.Difficulty or 'Standard' }}</div>
                 </div>
               </div>
-            <span class="row-sub">{{ activity.activity_date }}</span>
+            <span class="row-sub">{{ activity.ActivityDate }}</span>
           </div>
         </article>
         {% endfor %}

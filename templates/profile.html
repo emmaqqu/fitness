@@ -4,25 +4,25 @@
 <div class="profile-shell">
   <div class="profile-top-grid">
     <a class="profile-card-square" href="{{ url_for('progress', period='weekly') }}">
-      LEVEL {{ profile.level }}
-      <small>XP: {{ profile.xp }}</small>
+      LEVEL {{ profile.Level }}
+      <small>XP: {{ profile.XP }}</small>
     </a>
 
     <a class="avatar-core text-decoration-none" href="{{ url_for('edit_avatar') }}">
       <div class="avatar-disc {{ profile.theme_class if profile else 'avatar-theme-starter' }}">
         <img
           src="{{ url_for('static', filename=(profile.art_file if profile else 'avatars/starter_sprite.svg')) }}"
-          alt="{{ profile.avatar_name if profile else 'Starter Sprite' }} avatar"
+          alt="{{ profile.AvatarName if profile else 'Starter Sprite' }} avatar"
           class="avatar-disc-image"
         >
       </div>
-      <div class="avatar-caption">{{ profile.avatar_name if profile else 'Starter Sprite' }}</div>
+      <div class="avatar-caption">{{ profile.AvatarName if profile else 'Starter Sprite' }}</div>
       <div class="avatar-caption-muted">Tap to change</div>
     </a>
 
     <a class="profile-card-square" href="{{ url_for('friends') }}">
       ADD FRIENDS
-      <small>{{ friend_data.accepted|length }} connection(s)</small>
+      <small>{{ friend_data.Accepted|length }} connection(s)</small>
     </a>
   </div>
 
@@ -45,10 +45,10 @@
   <section class="panel p-4 mt-4">
     <h2 class="h5 mb-3">Physical Health Profile</h2>
     <div class="row g-2 small">
-      <div class="col-md-6"><strong>Conditions:</strong> {{ health.health_conditions if health and health.health_conditions else 'Not set' }}</div>
-      <div class="col-md-6"><strong>Movement Level:</strong> {{ health.activity_level if health and health.activity_level else 'Not set' }}</div>
-      <div class="col-md-6"><strong>Diet:</strong> {{ health.diet_profile if health and health.diet_profile else 'Not set' }}</div>
-      <div class="col-md-6"><strong>Climate:</strong> {{ health.climate if health and health.climate else 'Not set' }}</div>
+      <div class="col-md-6"><strong>Conditions:</strong> {{ health.HealthConditions if health and health.HealthConditions else 'Not set' }}</div>
+      <div class="col-md-6"><strong>Movement Level:</strong> {{ health.ActivityLevel if health and health.ActivityLevel else 'Not set' }}</div>
+      <div class="col-md-6"><strong>Diet:</strong> {{ health.DietProfile if health and health.DietProfile else 'Not set' }}</div>
+      <div class="col-md-6"><strong>Climate:</strong> {{ health.Climate if health and health.Climate else 'Not set' }}</div>
     </div>
 
     <h3 class="h6 mt-4 mb-2">Personalized Tips</h3>

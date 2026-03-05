@@ -43,9 +43,9 @@
         <div class="d-grid gap-2">
           {% for friend in game.coop_friends %}
           <form method="post" class="d-flex justify-content-between align-items-center border rounded px-2 py-2 bg-white">
-            <span class="fw-semibold small">{{ friend.friend_username }}</span>
+            <span class="fw-semibold small">{{ friend.FriendUsername }}</span>
             <input type="hidden" name="action" value="send_invite">
-            <input type="hidden" name="target_username" value="{{ friend.friend_username }}">
+            <input type="hidden" name="target_username" value="{{ friend.FriendUsername }}">
             <button class="btn btn-sm btn-outline-primary" type="submit">Invite</button>
           </form>
           {% endfor %}
@@ -63,17 +63,17 @@
         <div class="d-grid gap-2">
           {% for invite in game.incoming_invites %}
           <div class="border rounded px-2 py-2 bg-white">
-            <div class="small fw-semibold mb-2">{{ invite.from_username }} invited you</div>
+            <div class="small fw-semibold mb-2">{{ invite.FromUsername }} invited you</div>
             <div class="d-flex gap-2">
               <form method="post" class="m-0">
                 <input type="hidden" name="action" value="respond_invite">
-                <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+                <input type="hidden" name="invite_id" value="{{ invite.InviteID }}">
                 <input type="hidden" name="decision" value="accept">
                 <button class="btn btn-sm btn-success" type="submit">Accept</button>
               </form>
               <form method="post" class="m-0">
                 <input type="hidden" name="action" value="respond_invite">
-                <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+                <input type="hidden" name="invite_id" value="{{ invite.InviteID }}">
                 <input type="hidden" name="decision" value="decline">
                 <button class="btn btn-sm btn-outline-secondary" type="submit">Decline</button>
               </form>
@@ -92,10 +92,10 @@
         <div class="d-grid gap-2">
           {% for invite in game.outgoing_invites %}
           <div class="border rounded px-2 py-2 bg-white d-flex justify-content-between align-items-center">
-            <span class="small fw-semibold">Waiting on {{ invite.to_username }}</span>
+            <span class="small fw-semibold">Waiting on {{ invite.ToUsername }}</span>
             <form method="post" class="m-0">
               <input type="hidden" name="action" value="cancel_invite">
-              <input type="hidden" name="invite_id" value="{{ invite.invite_id }}">
+              <input type="hidden" name="invite_id" value="{{ invite.InviteID }}">
               <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
             </form>
           </div>
@@ -279,7 +279,7 @@
         <p class="mb-1"><strong>Winner:</strong> {{ game.winner }}</p>
         <p class="mb-1"><strong>XP Earned:</strong> {{ game.xp_earned }}</p>
         {% if game.session_result %}
-        <p class="mb-2"><strong>Level:</strong> {{ game.session_result.level }} | <strong>Total XP:</strong> {{ game.session_result.xp }}</p>
+        <p class="mb-2"><strong>Level:</strong> {{ game.session_result.Level }} | <strong>Total XP:</strong> {{ game.session_result.XP }}</p>
         {% endif %}
 
         {% if game.badges %}

@@ -22,8 +22,8 @@
 
     <section class="panel p-4">
       <h2 class="h5 mb-2">Recommended Intake</h2>
-      <p class="display-6 fw-bold text-primary mb-1">{{ recommendation.recommended }} kcal/day</p>
-      <p class="mb-0 muted-text">{{ recommendation.basis }}</p>
+      <p class="display-6 fw-bold text-primary mb-1">{{ recommendation.Recommended }} kcal/day</p>
+      <p class="mb-0 muted-text">{{ recommendation.Basis }}</p>
     </section>
   </div>
 
@@ -42,8 +42,8 @@
           <tbody>
             {% for item in logs %}
             <tr>
-              <td>{{ item.log_date }}</td>
-              <td>{{ item.calorie_intake }} kcal</td>
+              <td>{{ item.LogDate }}</td>
+              <td>{{ item.CalorieIntake }} kcal</td>
             </tr>
             {% endfor %}
           </tbody>
