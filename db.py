@@ -103,7 +103,7 @@ def _pascal_case(name: str) -> str:
     return "".join(part.upper() if part in acronyms else part.capitalize() for part in parts)
 
 
-def _quote_identifier(identifier: str) -> str:
+def _quote_identifier(identifier: str) -> str: # Wraps database identifiers in double quotes for SQL queries
     return f'"{identifier.replace(chr(34), chr(34) * 2)}"'
 
 
@@ -321,8 +321,8 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     aliases: dict[str, Any] = {}
 
     for key, value in normalized.items():
-        snake_key = _snake_case(str(key))
-        pascal_key = _pascal_case(str(key))
+        snake_key = _snake_case(str(key)) 
+        pascal_key = _pascal_case(str(key)) 
 
         if snake_key and snake_key not in normalized:
             aliases[snake_key] = value
@@ -529,7 +529,7 @@ def init_db() -> None:
         _ensure_column(conn, "HEALTH", "DietProfile", "TEXT")
         _ensure_column(conn, "HEALTH", "Climate", "TEXT")
 
-        # Switched from PascalCase to snake_case without realizing so...
+        # Mixed PascalCase and snake_case without realizing -->.
         # Legacy databases may have both public_token and PublicToken; keep the canonical field populated
         friend_link_columns = {str(column["name"]) for column in conn.execute("PRAGMA table_info(FRIEND_INVITE_LINKS)").fetchall()}
         if "PublicToken" in friend_link_columns and "public_token" in friend_link_columns:
@@ -584,7 +584,6 @@ def log_error(username: str | None, error_text: str) -> None:
     payload = error_text.strip().replace("\n", "\\n")
     with ERROR_LOG_PATH.open("a", encoding="utf-8") as log_file:
         log_file.write(f"{_now_str()} | {actor} | {payload}\n")
-
 
 # Users and authentication
 
@@ -1739,10 +1738,7 @@ def accept_friend_invite_link(raw_token: str, username: str) -> tuple[bool, str]
         )
     return True, f"Invite accepted. Friend request sent to {inviter}."
 
-
-# -------------------------
 # Co-op matchmaking
-# -------------------------
 
 def _are_friends(conn: sqlite3.Connection, user_a: str, user_b: str) -> bool:
     row = conn.execute(
@@ -2027,7 +2023,7 @@ def respond_coop_invite(
             (current_time, invite_id),
         )
 
-        # Once a match starts, close any other pending invite between the same pair.
+        # Once a match starts --> close any other pending invite between the same pair
         conn.execute(
             f"""
             UPDATE COOP_INVITES
@@ -2148,10 +2144,7 @@ def abandon_coop_match(username: str, match_id: int) -> tuple[bool, str]:
 
     return True, "Match abandoned."
 
-
-# -------------------------
 # Game and progression
-# -------------------------
 
 def create_game_session(
     username: str,
