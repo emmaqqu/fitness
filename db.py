@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 import sqlite3
 from contextlib import contextmanager
@@ -80,6 +81,226 @@ def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, 
     conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
+def _compact_name(name: str) -> str:
+    return "".join(ch for ch in str(name) if ch.isalnum()).lower()
+
+
+def _snake_case(name: str) -> str:
+    text = str(name).strip()
+    if not text:
+        return ""
+    text = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", text)
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
+    text = re.sub(r"[^A-Za-z0-9]+", "_", text)
+    return text.strip("_").lower()
+
+
+def _pascal_case(name: str) -> str:
+    parts = [part for part in _snake_case(name).split("_") if part]
+    if not parts:
+        return ""
+    acronyms = {"id", "xp"}
+    return "".join(part.upper() if part in acronyms else part.capitalize() for part in parts)
+
+
+def _quote_identifier(identifier: str) -> str:
+    return f'"{identifier.replace(chr(34), chr(34) * 2)}"'
+
+
+def _table_columns(conn: sqlite3.Connection, table_name: str) -> tuple[dict[str, str], dict[str, str]]:
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    exact = {}
+    compact = {}
+    for row in rows:
+        name = str(row["name"])
+        exact[name.lower()] = name
+        compact[_compact_name(name)] = name
+    return exact, compact
+
+
+def _resolve_column_name(
+    exact_columns: dict[str, str],
+    compact_columns: dict[str, str],
+    *candidates: str,
+) -> str:
+    for candidate in candidates:
+        found = exact_columns.get(candidate.lower())
+        if found:
+            return found
+    for candidate in candidates:
+        found = compact_columns.get(_compact_name(candidate))
+        if found:
+            return found
+    raise KeyError(f"Unable to resolve column name from candidates: {candidates}")
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND lower(name) = lower(?) LIMIT 1",
+        (table_name,),
+    ).fetchone()
+    return bool(row)
+
+
+def _user_table_names(conn: sqlite3.Connection) -> list[str]:
+    tables: list[str] = []
+    seen: set[str] = set()
+    for candidate in ("USER", "users"):
+        if not _table_exists(conn, candidate):
+            continue
+        lowered = candidate.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        tables.append(candidate)
+    return tables or ["USER"]
+
+
+def _friend_link_columns(conn: sqlite3.Connection) -> dict[str, str]:
+    exact_columns, compact_columns = _table_columns(conn, "FRIEND_INVITE_LINKS")
+    return {
+        "key": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "FriendInviteLinkKey",
+        ),
+        "public_token": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "PublicToken",
+            "public_token",
+        ),
+        "inviter_username": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "InviterUsername",
+            "inviter_username",
+        ),
+        "created_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "LinkCreatedAt",
+            "link_created_at",
+        ),
+        "expires_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "LinkExpiresAt",
+            "link_expires_at",
+        ),
+        "use_count": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "UseCount",
+            "use_count",
+        ),
+        "max_uses": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "MaxUses",
+            "max_uses",
+        ),
+        "is_active": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "IsActive",
+            "is_active",
+        ),
+    }
+
+
+def _coop_invite_columns(conn: sqlite3.Connection) -> dict[str, str]:
+    exact_columns, compact_columns = _table_columns(conn, "COOP_INVITES")
+    return {
+        "id": _resolve_column_name(exact_columns, compact_columns, "InviteID", "invite_id"),
+        "from_username": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "FromUsername",
+            "from_username",
+        ),
+        "to_username": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "ToUsername",
+            "to_username",
+        ),
+        "status": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "InviteStatus",
+            "invite_status",
+        ),
+        "created_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "InviteCreatedAt",
+            "invite_created_at",
+        ),
+        "responded_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "InviteRespondedAt",
+            "invite_responded_at",
+        ),
+    }
+
+
+def _coop_match_columns(conn: sqlite3.Connection) -> dict[str, str]:
+    exact_columns, compact_columns = _table_columns(conn, "COOP_MATCHES")
+    return {
+        "id": _resolve_column_name(exact_columns, compact_columns, "MatchID", "match_id"),
+        "player_one": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "PlayerOne",
+            "player_one",
+        ),
+        "player_two": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "PlayerTwo",
+            "player_two",
+        ),
+        "turn_username": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "TurnUsername",
+            "turn_username",
+        ),
+        "state_json": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "StateJson",
+            "state_json",
+        ),
+        "status": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "MatchStatus",
+            "match_status",
+        ),
+        "winner": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "MatchWinner",
+            "match_winner",
+        ),
+        "created_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "MatchCreatedAt",
+            "match_created_at",
+        ),
+        "updated_at": _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "MatchUpdatedAt",
+            "match_updated_at",
+        ),
+    }
+
+
 @contextmanager
 def db_session():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -96,20 +317,29 @@ def db_session():
         conn.close()
 
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
-    return dict(record)
+    normalized = dict(record)
+    aliases: dict[str, Any] = {}
+
+    for key, value in normalized.items():
+        snake_key = _snake_case(str(key))
+        pascal_key = _pascal_case(str(key))
+
+        if snake_key and snake_key not in normalized:
+            aliases[snake_key] = value
+        if pascal_key and pascal_key not in normalized:
+            aliases[pascal_key] = value
+
+    normalized.update(aliases)
+    return normalized
 
 
 def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
     return [_normalize_record(dict(row)) for row in rows]
 
-
-# -------------------------
 # Initialization and seeding
-# -------------------------
 
 def init_db() -> None:
     with db_session() as conn:
-        # Keep schema definitions centralized so new installs start with consistent PascalCase fields.
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS USER (
@@ -292,12 +522,23 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_friend_links_inviter ON FRIEND_INVITE_LINKS(InviterUsername, LinkCreatedAt)"
         )
-        # Keep additive migrations small and explicit for existing databases.
+        # Keep additive migrations small and explicit for existing databases
         _ensure_column(conn, "ACTIVITIES", "Difficulty", "TEXT NOT NULL DEFAULT 'Standard'")
         _ensure_column(conn, "FRIEND_INVITE_LINKS", "PublicToken", "TEXT")
         _ensure_column(conn, "HEALTH", "HealthConditions", "TEXT")
         _ensure_column(conn, "HEALTH", "DietProfile", "TEXT")
         _ensure_column(conn, "HEALTH", "Climate", "TEXT")
+
+        # Switched from PascalCase to snake_case without realizing so...
+        # Legacy databases may have both public_token and PublicToken; keep the canonical field populated
+        friend_link_columns = {str(column["name"]) for column in conn.execute("PRAGMA table_info(FRIEND_INVITE_LINKS)").fetchall()}
+        if "PublicToken" in friend_link_columns and "public_token" in friend_link_columns:
+            conn.execute(
+                """
+                UPDATE FRIEND_INVITE_LINKS
+                SET PublicToken = COALESCE(PublicToken, public_token)
+                """
+            )
 
         avatar_rows = [
             ("Starter Sprite", 1, "avatar_starter.png"),
@@ -328,9 +569,7 @@ def init_db() -> None:
         )
 
 
-# -------------------------
 # Logging
-# -------------------------
 
 def log_action(username: str | None, action: str) -> None:
     ACTION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -347,9 +586,7 @@ def log_error(username: str | None, error_text: str) -> None:
         log_file.write(f"{_now_str()} | {actor} | {payload}\n")
 
 
-# -------------------------
-# Users and auth
-# -------------------------
+# Users and authentication
 
 def create_user(
     username: str,
@@ -363,13 +600,46 @@ def create_user(
     date_joined = _today_str()
 
     with db_session() as conn:
-        conn.execute(
-            """
-            INSERT INTO USER (Username, Email, PasswordHash, FirstName, LastName, PhoneNum, DateJoined)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (username, email, password_hash, first_name, last_name, phone_num, date_joined),
-        )
+        for user_table in _user_table_names(conn):
+            exact_columns, compact_columns = _table_columns(conn, user_table)
+            username_col = _resolve_column_name(exact_columns, compact_columns, "Username", "username")
+            email_col = _resolve_column_name(exact_columns, compact_columns, "Email", "email")
+            password_col = _resolve_column_name(
+                exact_columns,
+                compact_columns,
+                "PasswordHash",
+                "password_hash",
+            )
+            first_name_col = _resolve_column_name(
+                exact_columns,
+                compact_columns,
+                "FirstName",
+                "first_name",
+            )
+            last_name_col = _resolve_column_name(
+                exact_columns,
+                compact_columns,
+                "LastName",
+                "last_name",
+            )
+            phone_col = _resolve_column_name(exact_columns, compact_columns, "PhoneNum", "phone_num")
+            joined_col = _resolve_column_name(exact_columns, compact_columns, "DateJoined", "date_joined")
+
+            conn.execute(
+                f"""
+                INSERT INTO {_quote_identifier(user_table)} (
+                    {_quote_identifier(username_col)},
+                    {_quote_identifier(email_col)},
+                    {_quote_identifier(password_col)},
+                    {_quote_identifier(first_name_col)},
+                    {_quote_identifier(last_name_col)},
+                    {_quote_identifier(phone_col)},
+                    {_quote_identifier(joined_col)}
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (username, email, password_hash, first_name, last_name, phone_num, date_joined),
+            )
 
         starter_avatar_row = conn.execute(
             "SELECT AvatarID FROM AVATAR ORDER BY UnlockLevel ASC, AvatarID ASC LIMIT 1"
@@ -389,18 +659,31 @@ def get_user_by_identity(identity: str) -> dict[str, Any] | None:
         return None
 
     with db_session() as conn:
-        by_username = conn.execute(
-            "SELECT * FROM USER WHERE lower(Username) = ?",
-            (lookup,),
-        ).fetchone()
-        if by_username:
-            return _normalize_record(dict(by_username))
+        for user_table in _user_table_names(conn):
+            exact_columns, compact_columns = _table_columns(conn, user_table)
+            username_col = _resolve_column_name(exact_columns, compact_columns, "Username", "username")
+            email_col = _resolve_column_name(exact_columns, compact_columns, "Email", "email")
 
-        by_email = conn.execute(
-            "SELECT * FROM USER WHERE lower(Email) = ?",
-            (lookup,),
-        ).fetchone()
-        return _normalize_record(dict(by_email)) if by_email else None
+            by_username = conn.execute(
+                f"""
+                SELECT * FROM {_quote_identifier(user_table)}
+                WHERE lower({_quote_identifier(username_col)}) = ?
+                """,
+                (lookup,),
+            ).fetchone()
+            if by_username:
+                return _normalize_record(dict(by_username))
+
+            by_email = conn.execute(
+                f"""
+                SELECT * FROM {_quote_identifier(user_table)}
+                WHERE lower({_quote_identifier(email_col)}) = ?
+                """,
+                (lookup,),
+            ).fetchone()
+            if by_email:
+                return _normalize_record(dict(by_email))
+        return None
 
 
 def authenticate_user(identity: str, password: str) -> tuple[dict[str, Any] | None, str]:
@@ -409,43 +692,102 @@ def authenticate_user(identity: str, password: str) -> tuple[dict[str, Any] | No
         return None, "Username or Email is required."
 
     with db_session() as conn:
-        user_row = conn.execute(
-            "SELECT * FROM USER WHERE lower(Username) = ?",
-            (lookup,),
-        ).fetchone()
-        if not user_row:
+        found: tuple[sqlite3.Row, str, str] | None = None
+        for user_table in _user_table_names(conn):
+            exact_columns, compact_columns = _table_columns(conn, user_table)
+            username_col = _resolve_column_name(exact_columns, compact_columns, "Username", "username")
+            email_col = _resolve_column_name(exact_columns, compact_columns, "Email", "email")
+            failed_login_col = _resolve_column_name(
+                exact_columns,
+                compact_columns,
+                "FailedLoginAttempts",
+                "failed_login_attempts",
+            )
+            locked_until_col = _resolve_column_name(
+                exact_columns,
+                compact_columns,
+                "LockedUntil",
+                "locked_until",
+            )
+
             user_row = conn.execute(
-                "SELECT * FROM USER WHERE lower(Email) = ?",
+                f"""
+                SELECT * FROM {_quote_identifier(user_table)}
+                WHERE lower({_quote_identifier(username_col)}) = ?
+                """,
                 (lookup,),
             ).fetchone()
+            if not user_row:
+                user_row = conn.execute(
+                    f"""
+                    SELECT * FROM {_quote_identifier(user_table)}
+                    WHERE lower({_quote_identifier(email_col)}) = ?
+                    """,
+                    (lookup,),
+                ).fetchone()
+            if user_row:
+                found = (user_row, user_table, username_col)
+                break
 
-        if not user_row:
+        if not found:
             return None, "Account not found."
 
-        locked_until = _parse_datetime(user_row["LockedUntil"])
+        user_row, user_table, username_col = found
+        exact_columns, compact_columns = _table_columns(conn, user_table)
+        failed_login_col = _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "FailedLoginAttempts",
+            "failed_login_attempts",
+        )
+        locked_until_col = _resolve_column_name(
+            exact_columns,
+            compact_columns,
+            "LockedUntil",
+            "locked_until",
+        )
+
+        user = _normalize_record(dict(user_row))
+        username_value = str(user.get("Username") or "").strip()
+        locked_until = _parse_datetime(str(user.get("LockedUntil") or ""))
         now = _now()
         if locked_until and now < locked_until:
             return None, f"Account locked until {locked_until.strftime(DATETIME_FORMAT)}."
 
-        if check_password_hash(user_row["PasswordHash"], password):
+        password_hash = str(user.get("PasswordHash") or "")
+        if password_hash and check_password_hash(password_hash, password):
             conn.execute(
-                "UPDATE USER SET FailedLoginAttempts = 0, LockedUntil = NULL WHERE Username = ?",
-                (user_row["Username"],),
+                f"""
+                UPDATE {_quote_identifier(user_table)}
+                SET {_quote_identifier(failed_login_col)} = 0,
+                    {_quote_identifier(locked_until_col)} = NULL
+                WHERE {_quote_identifier(username_col)} = ?
+                """,
+                (username_value,),
             )
-            return _normalize_record(dict(user_row)), ""
+            return user, ""
 
-        attempts = int(user_row["FailedLoginAttempts"]) + 1
+        attempts = int(user.get("FailedLoginAttempts") or 0) + 1
         if attempts >= 5:
             lock_time = now + timedelta(minutes=15)
             conn.execute(
-                "UPDATE USER SET FailedLoginAttempts = ?, LockedUntil = ? WHERE Username = ?",
-                (attempts, lock_time.strftime(DATETIME_FORMAT), user_row["Username"]),
+                f"""
+                UPDATE {_quote_identifier(user_table)}
+                SET {_quote_identifier(failed_login_col)} = ?,
+                    {_quote_identifier(locked_until_col)} = ?
+                WHERE {_quote_identifier(username_col)} = ?
+                """,
+                (attempts, lock_time.strftime(DATETIME_FORMAT), username_value),
             )
             return None, f"Too many failed attempts. Account locked until {lock_time.strftime(DATETIME_FORMAT)}."
 
         conn.execute(
-            "UPDATE USER SET FailedLoginAttempts = ? WHERE Username = ?",
-            (attempts, user_row["Username"]),
+            f"""
+            UPDATE {_quote_identifier(user_table)}
+            SET {_quote_identifier(failed_login_col)} = ?
+            WHERE {_quote_identifier(username_col)} = ?
+            """,
+            (attempts, username_value),
         )
         remaining = 5 - attempts
         return None, f"Invalid credentials. {remaining} attempt(s) remaining before lockout."
@@ -453,8 +795,19 @@ def authenticate_user(identity: str, password: str) -> tuple[dict[str, Any] | No
 
 def get_user(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
-        row = conn.execute("SELECT * FROM USER WHERE Username = ?", (username,)).fetchone()
-        return _normalize_record(dict(row)) if row else None
+        for user_table in _user_table_names(conn):
+            exact_columns, compact_columns = _table_columns(conn, user_table)
+            username_col = _resolve_column_name(exact_columns, compact_columns, "Username", "username")
+            row = conn.execute(
+                f"""
+                SELECT * FROM {_quote_identifier(user_table)}
+                WHERE {_quote_identifier(username_col)} = ?
+                """,
+                (username,),
+            ).fetchone()
+            if row:
+                return _normalize_record(dict(row))
+        return None
 
 
 def update_personal_info(
@@ -1232,14 +1585,26 @@ def create_friend_invite_link(username: str, ttl_days: int = 7, max_uses: int = 
     token_hash = _hash_token(raw_token)
 
     with db_session() as conn:
+        columns = _friend_link_columns(conn)
         conn.execute(
-            "DELETE FROM FRIEND_INVITE_LINKS WHERE IsActive = 0 OR LinkExpiresAt < ?",
+            f"""
+            DELETE FROM FRIEND_INVITE_LINKS
+            WHERE {_quote_identifier(columns["is_active"])} = 0
+               OR {_quote_identifier(columns["expires_at"])} < ?
+            """,
             (now.strftime(DATETIME_FORMAT),),
         )
         conn.execute(
-            """
+            f"""
             INSERT INTO FRIEND_INVITE_LINKS (
-                FriendInviteLinkKey, PublicToken, InviterUsername, LinkCreatedAt, LinkExpiresAt, UseCount, MaxUses, IsActive
+                {_quote_identifier(columns["key"])},
+                {_quote_identifier(columns["public_token"])},
+                {_quote_identifier(columns["inviter_username"])},
+                {_quote_identifier(columns["created_at"])},
+                {_quote_identifier(columns["expires_at"])},
+                {_quote_identifier(columns["use_count"])},
+                {_quote_identifier(columns["max_uses"])},
+                {_quote_identifier(columns["is_active"])}
             )
             VALUES (?, ?, ?, ?, ?, 0, ?, 1)
             """,
@@ -1265,14 +1630,22 @@ def create_friend_invite_link(username: str, ttl_days: int = 7, max_uses: int = 
 def list_friend_invite_links(username: str, limit: int = 8) -> list[dict[str, Any]]:
     now = _now().strftime(DATETIME_FORMAT)
     with db_session() as conn:
+        columns = _friend_link_columns(conn)
         rows = conn.execute(
-            """
-            SELECT FriendInviteLinkKey, LinkCreatedAt, LinkExpiresAt, UseCount, MaxUses, IsActive, PublicToken
+            f"""
+            SELECT
+                {_quote_identifier(columns["key"])},
+                {_quote_identifier(columns["created_at"])},
+                {_quote_identifier(columns["expires_at"])},
+                {_quote_identifier(columns["use_count"])},
+                {_quote_identifier(columns["max_uses"])},
+                {_quote_identifier(columns["is_active"])},
+                {_quote_identifier(columns["public_token"])}
             FROM FRIEND_INVITE_LINKS
-            WHERE InviterUsername = ?
-              AND IsActive = 1
-              AND LinkExpiresAt >= ?
-            ORDER BY LinkCreatedAt DESC
+            WHERE {_quote_identifier(columns["inviter_username"])} = ?
+              AND {_quote_identifier(columns["is_active"])} = 1
+              AND {_quote_identifier(columns["expires_at"])} >= ?
+            ORDER BY {_quote_identifier(columns["created_at"])} DESC
             LIMIT ?
             """,
             (username, now, limit),
@@ -1282,12 +1655,13 @@ def list_friend_invite_links(username: str, limit: int = 8) -> list[dict[str, An
 
 def disable_friend_invite_link(username: str, token_hash: str) -> tuple[bool, str]:
     with db_session() as conn:
+        columns = _friend_link_columns(conn)
         row = conn.execute(
-            """
-            SELECT FriendInviteLinkKey
+            f"""
+            SELECT {_quote_identifier(columns["key"])}
             FROM FRIEND_INVITE_LINKS
-            WHERE FriendInviteLinkKey = ?
-              AND InviterUsername = ?
+            WHERE {_quote_identifier(columns["key"])} = ?
+              AND {_quote_identifier(columns["inviter_username"])} = ?
             LIMIT 1
             """,
             (token_hash, username),
@@ -1296,7 +1670,11 @@ def disable_friend_invite_link(username: str, token_hash: str) -> tuple[bool, st
             return False, "Invite link not found."
 
         conn.execute(
-            "UPDATE FRIEND_INVITE_LINKS SET IsActive = 0 WHERE FriendInviteLinkKey = ?",
+            f"""
+            UPDATE FRIEND_INVITE_LINKS
+            SET {_quote_identifier(columns["is_active"])} = 0
+            WHERE {_quote_identifier(columns["key"])} = ?
+            """,
             (token_hash,),
         )
     return True, "Invite link disabled."
@@ -1310,25 +1688,33 @@ def accept_friend_invite_link(raw_token: str, username: str) -> tuple[bool, str]
     now = _now().strftime(DATETIME_FORMAT)
 
     with db_session() as conn:
+        columns = _friend_link_columns(conn)
         link = conn.execute(
-            """
-            SELECT FriendInviteLinkKey, InviterUsername, LinkExpiresAt, UseCount, MaxUses, IsActive
+            f"""
+            SELECT
+                {_quote_identifier(columns["key"])},
+                {_quote_identifier(columns["inviter_username"])},
+                {_quote_identifier(columns["expires_at"])},
+                {_quote_identifier(columns["use_count"])},
+                {_quote_identifier(columns["max_uses"])},
+                {_quote_identifier(columns["is_active"])}
             FROM FRIEND_INVITE_LINKS
-            WHERE FriendInviteLinkKey = ?
+            WHERE {_quote_identifier(columns["key"])} = ?
             LIMIT 1
             """,
             (token_hash,),
         ).fetchone()
         if not link:
             return False, "Invite link is invalid."
-        if int(link["IsActive"]) != 1:
+        link_data = _normalize_record(dict(link))
+        if int(link_data["IsActive"]) != 1:
             return False, "Invite link is inactive."
-        if str(link["LinkExpiresAt"]) < now:
+        if str(link_data["LinkExpiresAt"]) < now:
             return False, "Invite link has expired."
-        if int(link["UseCount"]) >= int(link["MaxUses"]):
+        if int(link_data["UseCount"]) >= int(link_data["MaxUses"]):
             return False, "Invite link usage limit reached."
 
-        inviter = str(link["InviterUsername"])
+        inviter = str(link_data["InviterUsername"])
         if inviter == username:
             return False, "You cannot use your own invite link."
 
@@ -1337,12 +1723,17 @@ def accept_friend_invite_link(raw_token: str, username: str) -> tuple[bool, str]
         return False, message
 
     with db_session() as conn:
+        columns = _friend_link_columns(conn)
         conn.execute(
-            """
+            f"""
             UPDATE FRIEND_INVITE_LINKS
-            SET UseCount = UseCount + 1,
-                IsActive = CASE WHEN UseCount + 1 >= MaxUses THEN 0 ELSE IsActive END
-            WHERE FriendInviteLinkKey = ?
+            SET {_quote_identifier(columns["use_count"])} = {_quote_identifier(columns["use_count"])} + 1,
+                {_quote_identifier(columns["is_active"])} = CASE
+                    WHEN {_quote_identifier(columns["use_count"])} + 1 >= {_quote_identifier(columns["max_uses"])}
+                    THEN 0
+                    ELSE {_quote_identifier(columns["is_active"])}
+                END
+            WHERE {_quote_identifier(columns["key"])} = ?
             """,
             (token_hash,),
         )
@@ -1371,14 +1762,15 @@ def _are_friends(conn: sqlite3.Connection, user_a: str, user_b: str) -> bool:
 
 
 def _has_active_coop_match(conn: sqlite3.Connection, user_a: str, user_b: str) -> bool:
+    columns = _coop_match_columns(conn)
     row = conn.execute(
-        """
+        f"""
         SELECT 1
         FROM COOP_MATCHES
-        WHERE MatchStatus = 'Active'
+        WHERE {_quote_identifier(columns["status"])} = 'Active'
           AND (
-                (PlayerOne = ? AND PlayerTwo = ?)
-             OR (PlayerOne = ? AND PlayerTwo = ?)
+                ({_quote_identifier(columns["player_one"])} = ? AND {_quote_identifier(columns["player_two"])} = ?)
+             OR ({_quote_identifier(columns["player_one"])} = ? AND {_quote_identifier(columns["player_two"])} = ?)
           )
         LIMIT 1
         """,
@@ -1410,13 +1802,12 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
     if from_username == to_username:
         return False, "You cannot invite yourself."
 
+    target = get_user(to_username)
+    if not target:
+        return False, "Friend account not found."
+
     with db_session() as conn:
-        target = conn.execute(
-            "SELECT Username FROM USER WHERE Username = ?",
-            (to_username,),
-        ).fetchone()
-        if not target:
-            return False, "Friend account not found."
+        invite_columns = _coop_invite_columns(conn)
 
         if not _are_friends(conn, from_username, to_username):
             return False, "You can only invite accepted friends."
@@ -1425,13 +1816,13 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
             return False, "You already have an active co-op match with this friend."
 
         existing_pending = conn.execute(
-            """
-            SELECT InviteID
+            f"""
+            SELECT {_quote_identifier(invite_columns["id"])}
             FROM COOP_INVITES
-            WHERE InviteStatus = 'Pending'
+            WHERE {_quote_identifier(invite_columns["status"])} = 'Pending'
               AND (
-                    (FromUsername = ? AND ToUsername = ?)
-                 OR (FromUsername = ? AND ToUsername = ?)
+                    ({_quote_identifier(invite_columns["from_username"])} = ? AND {_quote_identifier(invite_columns["to_username"])} = ?)
+                 OR ({_quote_identifier(invite_columns["from_username"])} = ? AND {_quote_identifier(invite_columns["to_username"])} = ?)
               )
             LIMIT 1
             """,
@@ -1441,8 +1832,13 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
             return False, "A pending co-op invite already exists."
 
         conn.execute(
-            """
-            INSERT INTO COOP_INVITES (FromUsername, ToUsername, InviteStatus, InviteCreatedAt)
+            f"""
+            INSERT INTO COOP_INVITES (
+                {_quote_identifier(invite_columns["from_username"])},
+                {_quote_identifier(invite_columns["to_username"])},
+                {_quote_identifier(invite_columns["status"])},
+                {_quote_identifier(invite_columns["created_at"])}
+            )
             VALUES (?, ?, 'Pending', ?)
             """,
             (from_username, to_username, _now_str()),
@@ -1453,13 +1849,14 @@ def create_coop_invite(from_username: str, to_username: str) -> tuple[bool, str]
 
 def cancel_coop_invite(username: str, invite_id: int) -> tuple[bool, str]:
     with db_session() as conn:
+        columns = _coop_invite_columns(conn)
         invite = conn.execute(
-            """
-            SELECT InviteID
+            f"""
+            SELECT {_quote_identifier(columns["id"])}
             FROM COOP_INVITES
-            WHERE InviteID = ?
-              AND FromUsername = ?
-              AND InviteStatus = 'Pending'
+            WHERE {_quote_identifier(columns["id"])} = ?
+              AND {_quote_identifier(columns["from_username"])} = ?
+              AND {_quote_identifier(columns["status"])} = 'Pending'
             """,
             (invite_id, username),
         ).fetchone()
@@ -1467,10 +1864,11 @@ def cancel_coop_invite(username: str, invite_id: int) -> tuple[bool, str]:
             return False, "Invite not found."
 
         conn.execute(
-            """
+            f"""
             UPDATE COOP_INVITES
-            SET InviteStatus = 'Cancelled', InviteRespondedAt = ?
-            WHERE InviteID = ?
+            SET {_quote_identifier(columns["status"])} = 'Cancelled',
+                {_quote_identifier(columns["responded_at"])} = ?
+            WHERE {_quote_identifier(columns["id"])} = ?
             """,
             (_now_str(), invite_id),
         )
@@ -1479,24 +1877,31 @@ def cancel_coop_invite(username: str, invite_id: int) -> tuple[bool, str]:
 
 def list_coop_invites(username: str) -> dict[str, list[dict[str, Any]]]:
     with db_session() as conn:
+        columns = _coop_invite_columns(conn)
         incoming_rows = conn.execute(
-            """
-            SELECT InviteID, FromUsername, InviteCreatedAt
+            f"""
+            SELECT
+                {_quote_identifier(columns["id"])},
+                {_quote_identifier(columns["from_username"])},
+                {_quote_identifier(columns["created_at"])}
             FROM COOP_INVITES
-            WHERE ToUsername = ?
-              AND InviteStatus = 'Pending'
-            ORDER BY InviteCreatedAt DESC
+            WHERE {_quote_identifier(columns["to_username"])} = ?
+              AND {_quote_identifier(columns["status"])} = 'Pending'
+            ORDER BY {_quote_identifier(columns["created_at"])} DESC
             """,
             (username,),
         ).fetchall()
 
         outgoing_rows = conn.execute(
-            """
-            SELECT InviteID, ToUsername, InviteCreatedAt
+            f"""
+            SELECT
+                {_quote_identifier(columns["id"])},
+                {_quote_identifier(columns["to_username"])},
+                {_quote_identifier(columns["created_at"])}
             FROM COOP_INVITES
-            WHERE FromUsername = ?
-              AND InviteStatus = 'Pending'
-            ORDER BY InviteCreatedAt DESC
+            WHERE {_quote_identifier(columns["from_username"])} = ?
+              AND {_quote_identifier(columns["status"])} = 'Pending'
+            ORDER BY {_quote_identifier(columns["created_at"])} DESC
             """,
             (username,),
         ).fetchall()
@@ -1511,13 +1916,19 @@ def list_coop_invites(username: str) -> dict[str, list[dict[str, Any]]]:
 
 def get_pending_coop_invite_for_user(username: str, invite_id: int) -> dict[str, Any] | None:
     with db_session() as conn:
+        columns = _coop_invite_columns(conn)
         row = conn.execute(
-            """
-            SELECT InviteID, FromUsername, ToUsername, InviteStatus, InviteCreatedAt
+            f"""
+            SELECT
+                {_quote_identifier(columns["id"])},
+                {_quote_identifier(columns["from_username"])},
+                {_quote_identifier(columns["to_username"])},
+                {_quote_identifier(columns["status"])},
+                {_quote_identifier(columns["created_at"])}
             FROM COOP_INVITES
-            WHERE InviteID = ?
-              AND ToUsername = ?
-              AND InviteStatus = 'Pending'
+            WHERE {_quote_identifier(columns["id"])} = ?
+              AND {_quote_identifier(columns["to_username"])} = ?
+              AND {_quote_identifier(columns["status"])} = 'Pending'
             LIMIT 1
             """,
             (invite_id, username),
@@ -1533,32 +1944,40 @@ def respond_coop_invite(
     turn_username: str | None = None,
 ) -> tuple[bool, str, int | None]:
     with db_session() as conn:
+        invite_columns = _coop_invite_columns(conn)
+        match_columns = _coop_match_columns(conn)
         invite = conn.execute(
-            """
-            SELECT InviteID, FromUsername, ToUsername, InviteStatus
+            f"""
+            SELECT
+                {_quote_identifier(invite_columns["id"])},
+                {_quote_identifier(invite_columns["from_username"])},
+                {_quote_identifier(invite_columns["to_username"])},
+                {_quote_identifier(invite_columns["status"])}
             FROM COOP_INVITES
-            WHERE InviteID = ?
-              AND ToUsername = ?
-              AND InviteStatus = 'Pending'
+            WHERE {_quote_identifier(invite_columns["id"])} = ?
+              AND {_quote_identifier(invite_columns["to_username"])} = ?
+              AND {_quote_identifier(invite_columns["status"])} = 'Pending'
             """,
             (invite_id, username),
         ).fetchone()
         if not invite:
             return False, "Invite not found.", None
 
+        invite_data = _normalize_record(dict(invite))
         if decision != "accept":
             conn.execute(
-                """
+                f"""
                 UPDATE COOP_INVITES
-                SET InviteStatus = 'Declined', InviteRespondedAt = ?
-                WHERE InviteID = ?
+                SET {_quote_identifier(invite_columns["status"])} = 'Declined',
+                    {_quote_identifier(invite_columns["responded_at"])} = ?
+                WHERE {_quote_identifier(invite_columns["id"])} = ?
                 """,
                 (_now_str(), invite_id),
             )
             return True, "Invite declined.", None
 
-        from_username = str(invite["FromUsername"])
-        to_username = str(invite["ToUsername"])
+        from_username = str(invite_data["FromUsername"])
+        to_username = str(invite_data["ToUsername"])
 
         if not _are_friends(conn, from_username, to_username):
             return False, "You are no longer accepted friends.", None
@@ -1574,16 +1993,16 @@ def respond_coop_invite(
             turn_username = from_username
 
         conn.execute(
-            """
+            f"""
             INSERT INTO COOP_MATCHES (
-                PlayerOne,
-                PlayerTwo,
-                TurnUsername,
-                StateJson,
-                MatchStatus,
-                MatchWinner,
-                MatchCreatedAt,
-                MatchUpdatedAt
+                {_quote_identifier(match_columns["player_one"])},
+                {_quote_identifier(match_columns["player_two"])},
+                {_quote_identifier(match_columns["turn_username"])},
+                {_quote_identifier(match_columns["state_json"])},
+                {_quote_identifier(match_columns["status"])},
+                {_quote_identifier(match_columns["winner"])},
+                {_quote_identifier(match_columns["created_at"])},
+                {_quote_identifier(match_columns["updated_at"])}
             )
             VALUES (?, ?, ?, ?, 'Active', NULL, ?, ?)
             """,
@@ -1599,23 +2018,25 @@ def respond_coop_invite(
         match_id = int(conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"])
 
         conn.execute(
-            """
+            f"""
             UPDATE COOP_INVITES
-            SET InviteStatus = 'Accepted', InviteRespondedAt = ?
-            WHERE InviteID = ?
+            SET {_quote_identifier(invite_columns["status"])} = 'Accepted',
+                {_quote_identifier(invite_columns["responded_at"])} = ?
+            WHERE {_quote_identifier(invite_columns["id"])} = ?
             """,
             (current_time, invite_id),
         )
 
         # Once a match starts, close any other pending invite between the same pair.
         conn.execute(
-            """
+            f"""
             UPDATE COOP_INVITES
-            SET InviteStatus = 'Cancelled', InviteRespondedAt = ?
-            WHERE InviteStatus = 'Pending'
+            SET {_quote_identifier(invite_columns["status"])} = 'Cancelled',
+                {_quote_identifier(invite_columns["responded_at"])} = ?
+            WHERE {_quote_identifier(invite_columns["status"])} = 'Pending'
               AND (
-                    (FromUsername = ? AND ToUsername = ?)
-                 OR (FromUsername = ? AND ToUsername = ?)
+                    ({_quote_identifier(invite_columns["from_username"])} = ? AND {_quote_identifier(invite_columns["to_username"])} = ?)
+                 OR ({_quote_identifier(invite_columns["from_username"])} = ? AND {_quote_identifier(invite_columns["to_username"])} = ?)
               )
             """,
             (current_time, from_username, to_username, to_username, from_username),
@@ -1626,22 +2047,18 @@ def respond_coop_invite(
 
 def get_active_coop_match_for_user(username: str) -> dict[str, Any] | None:
     with db_session() as conn:
+        columns = _coop_match_columns(conn)
         row = conn.execute(
-            """
-            SELECT
-                MatchID,
-                PlayerOne,
-                PlayerTwo,
-                TurnUsername,
-                StateJson,
-                MatchStatus,
-                MatchWinner,
-                MatchCreatedAt,
-                MatchUpdatedAt
+            f"""
+            SELECT *
             FROM COOP_MATCHES
-            WHERE MatchStatus = 'Active'
-              AND (PlayerOne = ? OR PlayerTwo = ?)
-            ORDER BY MatchUpdatedAt DESC, MatchID DESC
+            WHERE {_quote_identifier(columns["status"])} = 'Active'
+              AND (
+                    {_quote_identifier(columns["player_one"])} = ?
+                 OR {_quote_identifier(columns["player_two"])} = ?
+              )
+            ORDER BY {_quote_identifier(columns["updated_at"])} DESC,
+                     {_quote_identifier(columns["id"])} DESC
             LIMIT 1
             """,
             (username, username),
@@ -1651,21 +2068,16 @@ def get_active_coop_match_for_user(username: str) -> dict[str, Any] | None:
 
 def get_coop_match_for_user(username: str, match_id: int) -> dict[str, Any] | None:
     with db_session() as conn:
+        columns = _coop_match_columns(conn)
         row = conn.execute(
-            """
-            SELECT
-                MatchID,
-                PlayerOne,
-                PlayerTwo,
-                TurnUsername,
-                StateJson,
-                MatchStatus,
-                MatchWinner,
-                MatchCreatedAt,
-                MatchUpdatedAt
+            f"""
+            SELECT *
             FROM COOP_MATCHES
-            WHERE MatchID = ?
-              AND (PlayerOne = ? OR PlayerTwo = ?)
+            WHERE {_quote_identifier(columns["id"])} = ?
+              AND (
+                    {_quote_identifier(columns["player_one"])} = ?
+                 OR {_quote_identifier(columns["player_two"])} = ?
+              )
             LIMIT 1
             """,
             (match_id, username, username),
@@ -1681,16 +2093,17 @@ def update_coop_match_state(
     winner: str | None = None,
 ) -> None:
     with db_session() as conn:
+        columns = _coop_match_columns(conn)
         turn_value = turn_username or ""
         conn.execute(
-            """
+            f"""
             UPDATE COOP_MATCHES
-            SET StateJson = ?,
-                TurnUsername = ?,
-                MatchStatus = ?,
-                MatchWinner = ?,
-                MatchUpdatedAt = ?
-            WHERE MatchID = ?
+            SET {_quote_identifier(columns["state_json"])} = ?,
+                {_quote_identifier(columns["turn_username"])} = ?,
+                {_quote_identifier(columns["status"])} = ?,
+                {_quote_identifier(columns["winner"])} = ?,
+                {_quote_identifier(columns["updated_at"])} = ?
+            WHERE {_quote_identifier(columns["id"])} = ?
             """,
             (state_json, turn_value, status, winner, _now_str(), match_id),
         )
@@ -1698,32 +2111,37 @@ def update_coop_match_state(
 
 def abandon_coop_match(username: str, match_id: int) -> tuple[bool, str]:
     with db_session() as conn:
+        columns = _coop_match_columns(conn)
         row = conn.execute(
-            """
-            SELECT MatchID, PlayerOne, PlayerTwo, MatchStatus
+            f"""
+            SELECT *
             FROM COOP_MATCHES
-            WHERE MatchID = ?
-              AND (PlayerOne = ? OR PlayerTwo = ?)
+            WHERE {_quote_identifier(columns["id"])} = ?
+              AND (
+                    {_quote_identifier(columns["player_one"])} = ?
+                 OR {_quote_identifier(columns["player_two"])} = ?
+              )
             LIMIT 1
             """,
             (match_id, username, username),
         ).fetchone()
         if not row:
             return False, "Match not found."
-        if row["MatchStatus"] != "Active":
+        row_data = _normalize_record(dict(row))
+        if row_data["MatchStatus"] != "Active":
             return False, "Match is not active."
 
-        player_one = str(row["PlayerOne"])
-        player_two = str(row["PlayerTwo"])
+        player_one = str(row_data["PlayerOne"])
+        player_two = str(row_data["PlayerTwo"])
         winner = player_two if username == player_one else player_one
 
         conn.execute(
-            """
+            f"""
             UPDATE COOP_MATCHES
-            SET MatchStatus = 'Abandoned',
-                MatchWinner = ?,
-                MatchUpdatedAt = ?
-            WHERE MatchID = ?
+            SET {_quote_identifier(columns["status"])} = 'Abandoned',
+                {_quote_identifier(columns["winner"])} = ?,
+                {_quote_identifier(columns["updated_at"])} = ?
+            WHERE {_quote_identifier(columns["id"])} = ?
             """,
             (winner, _now_str(), match_id),
         )
@@ -1819,7 +2237,7 @@ def get_progress_dataset(username: str, days: int) -> dict[str, Any]:
     exercise_map = {row["day"]: row["total"] for row in exercise_rows}
 
     current = start_date
-    # Emit one row per day so charts stay stable even when no logs were entered.
+    # Make one row per day so charts stay stable even when no logs were entered
     while current <= end_date:
         key = current.isoformat()
         labels.append(key)
