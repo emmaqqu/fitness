@@ -1836,7 +1836,7 @@ def modify_activities():
             difficulty = request.form.get("difficulty", "Standard").strip().title()
             if difficulty not in WORKOUT_DIFFICULTIES:
                 difficulty = "Standard"
-            source = "Manual"`
+            source = "Manual"
 
             if not activity_type or duration_minutes <= 0:
                 raise ValueError
