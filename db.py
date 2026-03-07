@@ -1335,21 +1335,29 @@ def hydration_recommendation(username: str) -> dict[str, Any]:
 
 
 def personalized_health_tips(username: str) -> list[str]:
+    # Find user's stored health profile, empty dict if no record exists
     health = get_health(username) or {}
+
     goals = list_goals(username)
     activities = list_activities(username, limit=14)
+
+    # Initialization: Used to store generated recommendation tips
     tips: list[str] = []
 
+    # Make sure activity level is case-insensitive and no whitespaces
     activity_level = str(health.get("ActivityLevel") or "").strip().lower()
+
+    # If user = Inactive/No provided level
     if activity_level in {"", "sedentary"}:
         tips.append("Start with short daily movement blocks (10-15 min) and increase gradually.")
+    # If user = Active
     elif activity_level in {"active", "very active"}:
         tips.append("Schedule at least one recovery-focused session each week to support consistency.")
-
     climate = str(health.get("Climate") or "").strip().lower()
     if climate in {"hot", "humid", "dry"}:
         tips.append("Hydrate before and after sessions; hotter or drier climates usually require extra fluid.")
 
+    # Prioritize safety tips if a health condition is present
     conditions = str(health.get("HealthConditions") or "").strip()
     if conditions:
         tips.append("Use low-impact alternatives when needed and pace intensity around your listed conditions.")
@@ -1360,6 +1368,7 @@ def personalized_health_tips(username: str) -> list[str]:
     elif diet_profile:
         tips.append("Keep meals consistent with your diet preferences and prioritize minimally processed foods.")
 
+    # Tips based on active goals
     active_goal_types = {
         str(goal.get("GoalTypeName") or "").lower()
         for goal in goals
@@ -1378,6 +1387,7 @@ def personalized_health_tips(username: str) -> list[str]:
     elif recent_minutes > 300:
         tips.append("You are training at high volume; prioritize sleep and mobility to reduce injury risk.")
 
+    # Fallback advice
     if not tips:
         tips.append("Maintain a balanced routine of movement, hydration, nutrition, and sleep.")
     return tips[:6]
@@ -1390,7 +1400,6 @@ def _linear_search_health_topics(search_term: str) -> list[dict[str, Any]]:
         if search_term in haystack:
             matches.append(item)
     return matches
-
 
 def _binary_search_health_topic_exact(search_term: str) -> list[dict[str, Any]]:
     indexed_topics = sorted(
@@ -1409,12 +1418,11 @@ def _binary_search_health_topic_exact(search_term: str) -> list[dict[str, Any]]:
             high = mid - 1
         else:
             low = mid + 1
-
     return []
-
 
 def search_health_topics(query: str) -> dict[str, Any]:
     search_term = query.strip().lower()
+    # Check if search term is empty
     if not search_term:
         return _normalize_record(
             {
@@ -1424,6 +1432,7 @@ def search_health_topics(query: str) -> dict[str, Any]:
             }
         )
 
+    # First check binary for exact matches
     binary_results = _binary_search_health_topic_exact(search_term)
     if binary_results:
         return _normalize_record(
@@ -1434,6 +1443,7 @@ def search_health_topics(query: str) -> dict[str, Any]:
             }
         )
 
+    # If none, use linear to find partial matches
     return _normalize_record(
         {
             "Results": _linear_search_health_topics(search_term),
@@ -2232,7 +2242,7 @@ def get_progress_dataset(username: str, days: int) -> dict[str, Any]:
     current = start_date
     # Make one row per day so charts stay stable even when no logs were entered
     while current <= end_date:
-        key = current.isoformat()
+        key = current.isoformat() # isoformat --> datetime
         labels.append(key)
         calories_data.append(int(calorie_map.get(key, 0) or 0))
         hydration_data.append(round(float(hydration_map.get(key, 0.0) or 0.0), 2))

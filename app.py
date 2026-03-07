@@ -291,6 +291,8 @@ def _decorate_avatar_item(item: dict | None) -> dict | None:
 
 def _encode_card(color_code: str, exercise_code: str) -> str:
     exercise = GAME_EXERCISES[exercise_code]
+   
+    # Safe defaults --> Consistent structure
     effect = exercise.get("effect", "none")
     bonus_xp = int(exercise.get("bonus_xp", 0))
     return (
@@ -298,8 +300,8 @@ def _encode_card(color_code: str, exercise_code: str) -> str:
         f"|{effect}|{bonus_xp}"
     )
 
-
 def _decode_card(token: str) -> dict:
+    # Initialize 
     color_code = "W"
     exercise_code = "WD"
     minutes = 0
@@ -307,10 +309,15 @@ def _decode_card(token: str) -> dict:
     effect = "none"
     bonus_xp = 0
 
+    # Split the token
     parts = token.split("|")
+
+    # Read basic identifiers first
     if len(parts) >= 2:
         color_code = parts[0]
         exercise_code = parts[1]
+
+    # Parse numeric fields (Invalid fields = 0)
     if len(parts) >= 3:
         try:
             minutes = int(parts[2])
@@ -321,6 +328,8 @@ def _decode_card(token: str) -> dict:
             calories = int(parts[3])
         except ValueError:
             calories = 0
+        
+    # Optional gameplay effect & XP bonus 
     if len(parts) >= 5:
         effect = parts[4] or "none"
     if len(parts) >= 6:
@@ -331,11 +340,14 @@ def _decode_card(token: str) -> dict:
 
     color_info = GAME_COLORS.get(color_code, GAME_COLORS["W"])
     exercise = GAME_EXERCISES.get(exercise_code, GAME_EXERCISES["WD"])
+
+    # If token is incomplete or contains zero/default placeholders
     minutes = minutes or int(exercise["minutes"])
     calories = calories or int(exercise["calories"])
     effect = effect or str(exercise.get("effect", "none"))
     bonus_xp = bonus_xp or int(exercise.get("bonus_xp", 0))
 
+    # User friendly labels
     effect_labels = {
         "none": "Standard",
         "extra_turn": "Extra Turn",
@@ -343,6 +355,8 @@ def _decode_card(token: str) -> dict:
         "xp_boost": "XP Boost",
         "wild": "Wild Card",
     }
+
+    # Text explanation for effects
     effect_details = {
         "none": "Normal card with no extra gameplay effect.",
         "extra_turn": "After playing this card, you keep the turn and can play again.",
@@ -352,6 +366,7 @@ def _decode_card(token: str) -> dict:
     }
     effect_label = effect_labels.get(effect, effect)
 
+    # Return a fully expanded card object for game logic and UI rendering 
     return {
         "token": token,
         "color_code": color_code,
@@ -371,7 +386,9 @@ def _decode_card(token: str) -> dict:
 
 
 def _card_score(card: dict) -> float:
-    score = float(card["minutes"]) + (float(card["calories"]) / 12.0) + float(card["bonus_xp"]) # Base score calculation
+    # Base score calculation
+    score = float(card["minutes"]) + (float(card["calories"]) / 12.0) + float(card["bonus_xp"]) 
+
     # Effect Bonuses
     if card["effect"] == "extra_turn":
         score += 7
@@ -912,8 +929,13 @@ def _new_coop_player_state(hand: list[str]) -> dict:
 
 
 def _new_coop_match_state(player_one: str, player_two: str, difficulty: str) -> dict:
+    # Find difficulty settings --> if provided mode is invalid, select Standard
     difficulty_cfg = GAME_DIFFICULTIES.get(difficulty, GAME_DIFFICULTIES["Standard"])
+    
+    # Build/shuffle new deck
     deck = _build_game_deck()
+
+    # Deal 5 cards for each player
     player_one_hand = [deck.pop() for _ in range(5)]
     player_two_hand = [deck.pop() for _ in range(5)]
 
@@ -923,6 +945,7 @@ def _new_coop_match_state(player_one: str, player_two: str, difficulty: str) -> 
         random.shuffle(deck)
         top_discard = deck.pop()
 
+    # Create full shared match state
     state = {
         "mode": "Co-op",
         "difficulty": difficulty,
@@ -933,16 +956,25 @@ def _new_coop_match_state(player_one: str, player_two: str, difficulty: str) -> 
         "discard": [top_discard],
         "turn_count": 0,
         "message": f"Co-op match started. {player_one} plays first.",
+
+        # Keep each player's hand and progress in a separate nested sub-state
         "players": {
             player_one: _new_coop_player_state(player_one_hand),
             player_two: _new_coop_player_state(player_two_hand),
         },
+
+        # Track chronological gameplay events
         "event_log": [],
+
         "xp_earned_map": {},
         "session_results": {},
         "rewards_persisted": False,
+
+        # Reward calculation
         "difficulty_multiplier": float(difficulty_cfg["xp_multiplier"]),
     }
+
+    # Record match start in event log (Display and debugging purposes)
     _push_game_event(
         state,
         f"New {difficulty} Co-op match: {player_one} vs {player_two}. Complete your side quest for bonus XP.",
