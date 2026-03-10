@@ -85,6 +85,7 @@ def _compact_name(name: str) -> str:
     return "".join(ch for ch in str(name) if ch.isalnum()).lower()
 
 
+# Naming conventions ..
 def _snake_case(name: str) -> str:
     text = str(name).strip()
     if not text:
@@ -93,7 +94,6 @@ def _snake_case(name: str) -> str:
     text = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", text)
     text = re.sub(r"[^A-Za-z0-9]+", "_", text)
     return text.strip("_").lower()
-
 
 def _pascal_case(name: str) -> str:
     parts = [part for part in _snake_case(name).split("_") if part]
@@ -529,7 +529,7 @@ def init_db() -> None:
         _ensure_column(conn, "HEALTH", "DietProfile", "TEXT")
         _ensure_column(conn, "HEALTH", "Climate", "TEXT")
 
-        # Mixed PascalCase and snake_case without realizing -->.
+        # Mixed PascalCase and snake_case without realizing -->
         # Legacy databases may have both public_token and PublicToken; keep the canonical field populated
         friend_link_columns = {str(column["name"]) for column in conn.execute("PRAGMA table_info(FRIEND_INVITE_LINKS)").fetchall()}
         if "PublicToken" in friend_link_columns and "public_token" in friend_link_columns:
