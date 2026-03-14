@@ -300,6 +300,40 @@ def _coop_match_columns(conn: sqlite3.Connection) -> dict[str, str]:
         ),
     }
 
+def _game_session_table(conn: sqlite3.Connection) -> str:
+    if _table_exists(conn, "GAME_PLAYERS"):
+        fk_rows = conn.execute("PRAGMA foreign_key_list(GAME_PLAYERS)").fetchall()
+        for fk in fk_rows:
+            from_column = str(fk["from"] or "")
+            if _compact_name(from_column) != "sessionid" and "session" not in from_column.lower():
+                continue
+            referenced_table = str(fk["table"] or "").strip()
+            if referenced_table and _table_exists(conn, referenced_table):
+                return referenced_table
+
+    if _table_exists(conn, "game_sessions"):
+        return "game_sessions"
+    return "GAME"
+
+
+def _game_session_columns(conn: sqlite3.Connection, table_name: str) -> dict[str, str]:
+    exact_columns, compact_columns = _table_columns(conn, table_name)
+    return {
+        "mode_id": _resolve_column_name(exact_columns, compact_columns, "ModeID", "mode_id"),
+        "xp_earned": _resolve_column_name(exact_columns, compact_columns, "XPEarned", "xp_earned"),
+        "winner": _resolve_column_name(exact_columns, compact_columns, "GameWinner", "winner"),
+        "start_time": _resolve_column_name(exact_columns, compact_columns, "StartTime", "start_time"),
+        "end_time": _resolve_column_name(exact_columns, compact_columns, "EndTime", "end_time"),
+    }
+
+
+def _game_player_columns(conn: sqlite3.Connection) -> dict[str, str]:
+    exact_columns, compact_columns = _table_columns(conn, "GAME_PLAYERS")
+    return {
+        "session_id": _resolve_column_name(exact_columns, compact_columns, "SessionID", "session_id"),
+        "username": _resolve_column_name(exact_columns, compact_columns, "Username", "username"),
+    }
+
 
 @contextmanager
 def db_session():
@@ -1239,7 +1273,7 @@ def calorie_recommendation(username: str) -> dict[str, Any]:
             {
                 "Recommended": 2000,
                 "Basis": (
-                    "General baseline used. Add Age, Sex, height, weight, activity Level, and health notes "
+                    "General baseline used. Add age, sex, height, weight, activity level, and health notes "
                     "for personalized guidance."
                 ),
             }
@@ -1277,7 +1311,7 @@ def calorie_recommendation(username: str) -> dict[str, Any]:
         {
             "Recommended": recommended,
             "Basis": (
-                f"Estimated using Age, Sex, weight, height, activity Level, and overall health notes. "
+                f"Estimated using age, sex, weight, height, activity level, and overall health notes. "
                 f"{adjustment_note}"
             ),
         }
@@ -1329,7 +1363,7 @@ def hydration_recommendation(username: str) -> dict[str, Any]:
     return _normalize_record(
         {
             "Recommended": recommended,
-            "Basis": "General hydration estimate based on Age, Sex, activity Level, body weight, and climate.",
+            "Basis": "General hydration estimate based on age, sex, activity level, body weight, and climate.",
         }
     )
 
@@ -2165,6 +2199,9 @@ def create_game_session(
     start = _now_str()
 
     with db_session() as conn:
+        session_table = _game_session_table(conn)
+        session_columns = _game_session_columns(conn, session_table)
+
         mode = conn.execute(
             "SELECT ModeID FROM GAME_MODES WHERE ModeName = ?",
             (mode_name,),
@@ -2177,18 +2214,36 @@ def create_game_session(
             ).fetchone()
 
         conn.execute(
-            """
-            INSERT INTO GAME (ModeID, XPEarned, GameWinner, StartTime, EndTime)
+            f"""
+            INSERT INTO {_quote_identifier(session_table)} (
+                {_quote_identifier(session_columns["mode_id"])},
+                {_quote_identifier(session_columns["xp_earned"])},
+                {_quote_identifier(session_columns["winner"])},
+                {_quote_identifier(session_columns["start_time"])},
+                {_quote_identifier(session_columns["end_time"])}
+            )
             VALUES (?, ?, ?, ?, ?)
             """,
             (mode["ModeID"], xp_earned, winner, start, _now_str()),
         )
         session_id = conn.execute("SELECT last_insert_rowid() AS id").fetchone()["id"]
 
-        conn.execute(
-            "INSERT INTO GAME_PLAYERS (SessionID, Username) VALUES (?, ?)",
-            (session_id, username),
-        )
+        if _table_exists(conn, "GAME_PLAYERS"):
+            player_columns = _game_player_columns(conn)
+            try:
+                conn.execute(
+                    f"""
+                    INSERT INTO GAME_PLAYERS (
+                        {_quote_identifier(player_columns["session_id"])},
+                        {_quote_identifier(player_columns["username"])}
+                    )
+                    VALUES (?, ?)
+                    """,
+                    (session_id, username),
+                )
+            except sqlite3.IntegrityError:
+                # Persisting players is best-effort; XP/level progression should still work.
+                pass
 
     xp_state = award_xp(username, xp_earned)
     return _normalize_record({"SessionID": session_id, **xp_state})

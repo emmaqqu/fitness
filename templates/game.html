@@ -114,6 +114,22 @@
   </section>
 
   {% else %}
+  {% if game.status == 'finished' %}
+  <section class="panel p-3 mb-3 game-message">
+    <div class="row-main mb-1">Match Over</div>
+    <div class="row-sub">
+      Winner:
+      {% if current_user and game.winner == current_user %}
+        You
+      {% elif game.winner %}
+        {{ game.winner }}
+      {% else %}
+        Unknown
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
   <div class="game-stat-row mb-3">
     <span class="game-stat-chip">Turns: {{ game.turn_count }}</span>
     <span class="game-stat-chip">Combo: {{ game.combo_streak }}</span>
@@ -276,7 +292,15 @@
         <p class="mb-2"><strong>Calories Burned:</strong> {{ game.player_total_calories }}</p>
 
         {% if game.status == 'finished' %}
-        <p class="mb-1"><strong>Winner:</strong> {{ game.winner }}</p>
+        <p class="mb-1"><strong>Winner:</strong>
+          {% if current_user and game.winner == current_user %}
+            You
+          {% elif game.winner %}
+            {{ game.winner }}
+          {% else %}
+            Unknown
+          {% endif %}
+        </p>
         <p class="mb-1"><strong>XP Earned:</strong> {{ game.xp_earned }}</p>
         {% if game.session_result %}
         <p class="mb-2"><strong>Level:</strong> {{ game.session_result.Level }} | <strong>Total XP:</strong> {{ game.session_result.XP }}</p>

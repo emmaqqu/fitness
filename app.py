@@ -154,7 +154,7 @@ def _derive_activity_duration(
 
 GAME_MODES = {"Solo": "AI Bot", "Co-op": "Training Partner"}
 GAME_DIFFICULTIES = {
-    "Easy": {"opponent_hand_size": 4, "xp_multiplier": 0.9},
+    "Easy": {"opponent_hand_size": 5, "xp_multiplier": 0.9},
     "Standard": {"opponent_hand_size": 5, "xp_multiplier": 1.0},
     "Hard": {"opponent_hand_size": 6, "xp_multiplier": 1.15},
 }
@@ -386,18 +386,46 @@ def _decode_card(token: str) -> dict:
 
 
 def _card_score(card: dict) -> float:
-    # Base score calculation
-    score = float(card["minutes"]) + (float(card["calories"]) / 12.0) + float(card["bonus_xp"]) 
+    # Tie-breaker heuristic for AI decisions (do not over-weight bonus_xp because
+    # it only benefits the human player at end-of-match).
+    return float(card["minutes"]) + (float(card["calories"]) / 12.0)
 
-    # Effect Bonuses
-    if card["effect"] == "extra_turn":
-        score += 7
-    elif card["effect"] == "opponent_draw":
-        score += 5
-    elif card["effect"] == "xp_boost":
-        score += 4
-    elif card["effect"] == "wild":
-        score += 3
+
+def _ai_card_score(
+    card: dict,
+    state: dict,
+    remaining_hand_tokens: list[str],
+    difficulty: str,
+    has_non_wild_playable: bool,
+) -> float:
+    score = _card_score(card) * 0.15
+
+    player_cards_left = len(state.get("player_hand", []))
+    opponent_cards_left_after = max(0, len(state.get("opponent_hand", [])) - 1)
+    effect = str(card.get("effect") or "none")
+
+    if effect == "extra_turn":
+        score += 20.0
+        if opponent_cards_left_after <= 2:
+            score += 10.0
+        elif opponent_cards_left_after <= 4:
+            score += 4.0
+    elif effect == "opponent_draw":
+        score += 14.0
+        if player_cards_left <= 2:
+            score += 12.0
+        elif player_cards_left <= 4:
+            score += 6.0
+    elif effect == "wild":
+        score += 6.0
+
+    followups = sum(1 for token in remaining_hand_tokens if _is_playable_card(token, card["token"]))
+    score += followups * (2.2 if difficulty == "Hard" else 1.6)
+
+    # Conserve wild cards when other plays are available, especially early.
+    if effect == "wild" and has_non_wild_playable and opponent_cards_left_after > 1:
+        score -= 14.0 if difficulty == "Hard" else 8.0
+
     return score
 
 
@@ -463,6 +491,32 @@ def _is_playable_card(card_token: str, top_token: str) -> bool:
         card["color_code"] == top["color_code"]
         or card["exercise_code"] == top["exercise_code"]
     )
+
+
+def _has_playable_card(hand_tokens: list[str], top_token: str) -> bool:
+    return any(_is_playable_card(token, top_token) for token in hand_tokens)
+
+
+def _is_solo_stalemate(state: dict) -> bool:
+    if state.get("status") != "active":
+        return False
+
+    if state.get("deck"):
+        return False
+
+    discard = state.get("discard") or []
+    if not discard:
+        return False
+    # If there is more than one discard card, a draw would recycle into the deck.
+    if len(discard) > 1:
+        return False
+
+    top_token = discard[-1]
+    if _has_playable_card(state.get("player_hand", []), top_token):
+        return False
+    if _has_playable_card(state.get("opponent_hand", []), top_token):
+        return False
+    return True
 
 
 def _push_game_event(state: dict, message: str) -> None:
@@ -702,10 +756,16 @@ def _select_ai_card_index(playable_indexes: list[int], state: dict) -> int:
     if difficulty == "Easy":
         return random.choice(playable_indexes)
 
-    scored = []
+    has_non_wild_playable = any(
+        _decode_card(state["opponent_hand"][index]).get("effect") != "wild"
+        for index in playable_indexes
+    )
+
+    scored: list[tuple[int, float]] = []
     for index in playable_indexes:
         card = _decode_card(state["opponent_hand"][index])
-        scored.append((index, _card_score(card)))
+        remaining = [token for idx, token in enumerate(state["opponent_hand"]) if idx != index]
+        scored.append((index, _ai_card_score(card, state, remaining, str(difficulty), has_non_wild_playable)))
 
     scored.sort(key=lambda item: item[1], reverse=True)
     if difficulty == "Hard":
@@ -723,8 +783,14 @@ def _opponent_turn(state: dict, username: str) -> None:
     opponent_name = state["opponent_name"]
     action_parts: list[str] = []
 
+    max_chain = 4
+    if state.get("difficulty") == "Standard":
+        max_chain = 6
+    elif state.get("difficulty") == "Hard":
+        max_chain = 8
+
     chain_guard = 0
-    while state.get("status") == "active" and chain_guard < 4:
+    while state.get("status") == "active" and chain_guard < max_chain:
         chain_guard += 1
         top_token = state["discard"][-1]
         playable_indexes = [
@@ -772,6 +838,16 @@ def _opponent_turn(state: dict, username: str) -> None:
 
     state["opponent_action"] = " ".join(action_parts) if action_parts else f"{opponent_name} passed."
     _push_game_event(state, state["opponent_action"])
+
+    if _is_solo_stalemate(state):
+        player_left = len(state.get("player_hand", []))
+        opponent_left = len(state.get("opponent_hand", []))
+        winner_name = username if player_left <= opponent_left else opponent_name
+        _push_game_event(
+            state,
+            "Stalemate: deck is empty and no playable cards remain. Winner determined by fewest cards.",
+        )
+        _finish_game(state, username, winner_name)
 
     if state.get("status") == "active":
         state["turn"] = "player"
@@ -839,7 +915,14 @@ def _draw_player_card(state: dict, username: str) -> str:
 
     drawn = _draw_to_hand(state, "player_hand")
     if not drawn:
-        return "Deck is empty. You cannot draw."
+        top_token = state["discard"][-1]
+        if _has_playable_card(state.get("player_hand", []), top_token):
+            return "Deck is empty. You cannot draw."
+
+        state["message"] = "Deck is empty and you have no playable cards. Turn passed."
+        _push_game_event(state, state["message"])
+        _opponent_turn(state, username)
+        return state["message"]
 
     state["turn_count"] += 1
     state["draw_count"] += 1
@@ -1185,7 +1268,15 @@ def _coop_draw_card(state: dict, username: str) -> str:
 
     drawn = _draw_for_coop_player(state, username)
     if not drawn:
-        return "Deck is empty. Cannot draw."
+        top_token = state["discard"][-1]
+        if _has_playable_card(player_state.get("hand", []), top_token):
+            return "Deck is empty. Cannot draw."
+
+        opponent = _other_coop_username(state, username)
+        state["turn_username"] = opponent or username
+        state["message"] = f"Deck is empty and {username} has no playable cards. Turn passed."
+        _push_game_event(state, state["message"])
+        return state["message"]
 
     player_state["draw_count"] += 1
     player_state["combo_streak"] = 0
@@ -1490,14 +1581,12 @@ def _build_adaptive_challenges(activities: list[dict]) -> list[dict]:
         },
     ]
 
-
 def _resolve_progress_period(period_value: str | None) -> tuple[str, int, str]:
     period_key = str(period_value or "").strip().lower()
     if period_key not in PROGRESS_PERIODS:
         period_key = "weekly"
     period_config = PROGRESS_PERIODS[period_key]
     return period_key, int(period_config["days"]), str(period_config["label"])
-
 
 def _build_period_trend(rows: list[dict], period_key: str) -> list[dict]:
     if not rows:
@@ -1705,7 +1794,6 @@ def register():
 
     return render_template("register.html")
 
-
 @app.route("/sso/start", methods=["POST"])
 def sso_start():
     if "username" in session:
@@ -1795,7 +1883,6 @@ def home():
         activity_preview=summary["RecentActivities"][:2],
         adaptive_challenges=_build_adaptive_challenges(recent_for_challenges),
     )
-
 
 @app.route("/modifygoals", methods=["GET", "POST"])
 def modify_goals():
@@ -1917,7 +2004,6 @@ def modify_activities():
         activities=activities,
         today=datetime.now().date().isoformat(),
     )
-
 
 @app.route("/game", methods=["GET", "POST"])
 def game():
@@ -2153,11 +2239,9 @@ def coop_game():
     log_action(_username(), "Opened co-op game")
     return redirect(url_for("game"))
 
-
 @app.route("/help")
 def help_support_alias():
     return redirect(url_for("search"))
-
 
 @app.route("/search", methods=["GET", "POST"])
 def search():
@@ -2481,7 +2565,7 @@ def handle_unexpected_error(error: Exception):
         return error
 
     log_error(session.get("username"), traceback.format_exc())
-    flash("An unexpected error occurred. The issue was logged to instance/errors.log.", "danger")
+    flash("An unexpected error occurred.", "danger")
     if "username" in session:
         return redirect(url_for("home"))
     return redirect(url_for("login"))
